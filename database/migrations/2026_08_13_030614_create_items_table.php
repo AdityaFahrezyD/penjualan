@@ -15,6 +15,7 @@ return new class extends Migration
             $table->uuid('item_id')->primary();
             $table->string('item_name', 60);
             $table->integer('stock')->default(0);
+            $table->integer('item_price')->default(0);
             $table->timestamps();
         });
     }
