@@ -17,10 +17,13 @@ class msTransaction extends Model
         'supplier_id',
         'tr_date',
         'payment_method',
+        'total',
+        'status',
     ];
 
     protected $casts = [
         'tr_date' => 'date',
+        'total' => 'integer',
     ];
     
     public function mstransactionsSuppliers()

@@ -47,11 +47,13 @@ class ItemController extends Controller
         $validated = $request->validate([
             'item_name' => ['required', 'string', 'max:60'],
             'stock' => ['nullable', 'integer', 'min:0'],
+            'item_price' => ['required', 'integer', 'min:0']
         ]);
 
         $item = Item::create([
             'item_name' => $validated['item_name'],
             'stock' => $validated['stock'] ?? 0,
+            'item_price' => $validated['item_price'] ?? 0
         ]);
 
         return response()->json([
@@ -76,6 +78,7 @@ class ItemController extends Controller
         $validated = $request->validate([
             'item_name' => ['required', 'string', 'max:60'],
             'stock' => ['required', 'integer', 'min:0'],
+            'item_price' => ['required', 'integer', 'min:0'],
         ]);
 
         $item->update($validated);

@@ -16,10 +16,12 @@ class Item extends Model
     protected $fillable = [
         'item_name',
         'stock',
+        'item_price'
     ];
 
     protected $casts = [
         'stock' => 'integer',
+        'item_price' => 'integer',
     ];
 
 

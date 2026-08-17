@@ -16,6 +16,8 @@ return new class extends Migration
             $table->uuid('supplier_id');
             $table->date('tr_date');
             $table->enum('payment_method', ['cash', 'cashless'])->nullable();
+            $table->integer('total')->default(0);
+            $table->enum('status', ['pending', 'completed', 'cancelled'])->default('pending');
             $table->foreign('supplier_id')->references('supplier_id')->on('suppliers')->restrictOnUpdate()->restrictOnDelete();
             $table->timestamps();
         });

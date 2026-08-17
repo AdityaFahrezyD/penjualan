@@ -23,6 +23,7 @@ class ItemSeeder extends Seeder
                 'item_id'    => (string) Str::uuid(),
                 'item_name'  => substr($faker->words(3, true), 0, 60), // Memastikan max 60 karakter
                 'stock'      => $faker->numberBetween(0, 100),
+                'item_price' => $faker->numberBetween(1000, 100000), // Menambahkan harga item
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

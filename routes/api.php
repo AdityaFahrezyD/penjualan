@@ -19,14 +19,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('suppliers', SupplierController::class);
     });
 
-    // Admin & Akuntan
+    // Admin akuntan
     Route::middleware('role:admin,akuntan')->group(function () {
         Route::apiResource('transactions', MsTransactionController::class)
+            ->parameters(['transactions' => 'tr_id',]);
+
+        Route::patch(
+            'transactions/{tr_id}/complete',
+            [MsTransactionController::class, 'complete']
+        );
+
+        Route::patch(
+            'transactions/{tr_id}/cancel',
+            [MsTransactionController::class, 'cancel']
+        );
+
+        Route::apiResource('suppliers', SupplierController::class)
             ->only([
                 'index',
-                'store',
                 'show',
-                'destroy',
+            ]);
+        Route::apiResource('items', ItemController::class)
+            ->only([
+                'index',
+                'show',
             ]);
     });
 
