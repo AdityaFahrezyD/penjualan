@@ -2,59 +2,37 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Item;
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreItemRequest;
+use App\Http\Requests\UpdateItemRequest;
+use App\Services\ItemService;
 
 class ItemController extends Controller
 {
-    /**
-     * Menampilkan semua item.
-     */
+    public function __construct(
+        private ItemService $itemService
+    ) {}
+
     public function index()
     {
-        $items = Item::orderBy('item_name')->get();
-
         return response()->json([
             'message' => 'Data barang berhasil diambil',
-            'data' => $items,
+            'data' => $this->itemService->getAll(),
         ]);
     }
 
-    /**
-     * Menampilkan satu item.
-     */
     public function show(string $item_id)
     {
-        $item = Item::find($item_id);
-
-        if (!$item) {
-            return response()->json([
-                'message' => 'Barang tidak ditemukan',
-            ], 404);
-        }
-
         return response()->json([
             'message' => 'Data barang berhasil diambil',
-            'data' => $item,
+            'data' => $this->itemService->getById($item_id),
         ]);
     }
 
-    /**
-     * Menambahkan item.
-     */
-    public function store(Request $request)
+    public function store(StoreItemRequest $request)
     {
-        $validated = $request->validate([
-            'item_name' => ['required', 'string', 'max:60'],
-            'stock' => ['nullable', 'integer', 'min:0'],
-            'item_price' => ['required', 'integer', 'min:0']
-        ]);
-
-        $item = Item::create([
-            'item_name' => $validated['item_name'],
-            'stock' => $validated['stock'] ?? 0,
-            'item_price' => $validated['item_price'] ?? 0
-        ]);
+        $item = $this->itemService->create(
+            $request->validated()
+        );
 
         return response()->json([
             'message' => 'Barang berhasil ditambahkan',
@@ -62,47 +40,24 @@ class ItemController extends Controller
         ], 201);
     }
 
-    /**
-     * Mengubah item.
-     */
-    public function update(Request $request, string $item_id)
-    {
-        $item = Item::find($item_id);
-
-        if (!$item) {
-            return response()->json([
-                'message' => 'Barang tidak ditemukan',
-            ], 404);
-        }
-
-        $validated = $request->validate([
-            'item_name' => ['required', 'string', 'max:60'],
-            'stock' => ['required', 'integer', 'min:0'],
-            'item_price' => ['required', 'integer', 'min:0'],
-        ]);
-
-        $item->update($validated);
+    public function update(
+        UpdateItemRequest $request,
+        string $item_id
+    ) {
+        $item = $this->itemService->update(
+            $item_id,
+            $request->validated()
+        );
 
         return response()->json([
             'message' => 'Barang berhasil diubah',
-            'data' => $item->fresh(),
+            'data' => $item,
         ]);
     }
 
-    /**
-     * Menghapus item.
-     */
     public function destroy(string $item_id)
     {
-        $item = Item::find($item_id);
-
-        if (!$item) {
-            return response()->json([
-                'message' => 'Barang tidak ditemukan',
-            ], 404);
-        }
-
-        $item->delete();
+        $this->itemService->delete($item_id);
 
         return response()->json([
             'message' => 'Barang berhasil dihapus',
