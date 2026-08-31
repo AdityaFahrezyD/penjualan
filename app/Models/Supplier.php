@@ -14,14 +14,30 @@ class Supplier extends Model
     public $incrementing = false;
 
     protected $fillable = [
+        'user_id',
         'supplier_name',
         'phone',
         'address',
     ];
 
-    public function suppliersMstransactions()
+    // public function suppliersMstransactions()
+    // {
+    //     return $this->hasMany(MsTransaction::class, 'supplier_id', 'supplier_id');
+    // }
+
+    public function suppliersRequestSuppliers()
     {
-        return $this->hasMany(MsTransaction::class, 'supplier_id', 'supplier_id');
+        return $this->hasMany(RequestSupplier::class, 'supplier_id', 'supplier_id');
+    }
+
+    public function suppliersPurchaseOrder()
+    {
+        return $this->hasMany(PurchaseOrder::class, 'supplier_id', 'supplier_id');
+    }
+
+    public function supplierUser()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
 }

@@ -3,47 +3,60 @@
 namespace App\Services;
 
 use App\Models\Item;
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 
 class ItemService
 {
     public function getAll()
     {
-        return Item::orderBy('item_name')->get();
+        return Item::with('itemUnit')
+            ->orderBy('item_name')
+            ->get();
     }
 
     public function getById(string $item_id): Item
     {
-        $item = Item::find($item_id);
-
-        if (!$item) {
-            abort(404, 'Barang tidak ditemukan');
-        }
-
-        return $item;
+        return Item::with('itemUnit')
+            ->findOrFail($item_id);
     }
 
     public function create(array $data): Item
     {
         return Item::create([
             'item_name' => $data['item_name'],
-            'stock' => $data['stock'] ?? 0,
-            'item_price' => $data['item_price'],
-        ]);
+            'stock' => $data['stock'],
+            'unit_id' => $data['unit_id'],
+        ])->load('itemUnit');
     }
 
-    public function update(string $item_id, array $data): Item
+    public function update(string $item_id,array $data): Item 
     {
-        $item = $this->getById($item_id);
+        $item = Item::findOrFail($item_id);
 
-        $item->update($data);
+        $item->update([
+            'item_name' => $data['item_name']
+                ?? $item->item_name,
 
-        return $item->fresh();
+            'unit_id' => $data['unit_id']
+                ?? $item->unit_id,
+        ]);
+
+        return $item->fresh()->load('itemUnit');
     }
 
     public function delete(string $item_id): void
     {
-        $item = $this->getById($item_id);
+        $item = Item::findOrFail($item_id);
 
-        $item->delete();
+        try {
+            $item->delete();
+        } catch (QueryException $e) {
+            throw ValidationException::withMessages([
+                'item' => [
+                    'Item tidak dapat dihapus karena masih digunakan dalam dokumen procurement.',
+                ],
+            ]);
+        }
     }
 }

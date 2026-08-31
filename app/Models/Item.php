@@ -16,17 +16,26 @@ class Item extends Model
     protected $fillable = [
         'item_name',
         'stock',
-        'item_price'
+        'unit_id',
     ];
 
-    protected $casts = [
-        'stock' => 'integer',
-        'item_price' => 'integer',
-    ];
+    // public function itemDetailTransactions()
+    // {
+    //     return $this->hasMany(detailTransaction::class, 'item_id', 'item_id');
+    // }
 
-
-    public function itemDetailTransactions()
+    public function itemUnit()
     {
-        return $this->hasMany(detailTransaction::class, 'item_id', 'item_id');
+        return $this->belongsTo(Unit::class, 'unit_id', 'unit_id');
+    }
+
+    public function itemDetailPurchaseRequest()
+    {
+        return $this->hasMany(DetailPurchaseRequest::class,'item_id','item_id');
+    }
+
+    public function itemDetailPurchaseOrder()
+    {
+        return $this->hasMany(DetailPurchaseOrder::class,'item_id','item_id');
     }
 }
