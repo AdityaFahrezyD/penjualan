@@ -15,7 +15,7 @@ class PurchaseRequestService
     {
         return PurchaseRequest::with([
             'purchaseRequestUser',
-            'detailPurchaseRequests.item',
+            'purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
         ])
             ->orderByDesc('request_date')
             ->get();
@@ -25,7 +25,7 @@ class PurchaseRequestService
     {
         return PurchaseRequest::with([
             'purchaseRequestUser',
-            'detailPurchaseRequests.item',
+            'purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
         ])
             ->findOrFail($purchase_request_id);
     }
@@ -58,7 +58,7 @@ class PurchaseRequestService
 
             return $purchaseRequest->load([
                 'purchaseRequestUser',
-                'detailPurchaseRequests.item',
+                'purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
             ]);
         });
     }

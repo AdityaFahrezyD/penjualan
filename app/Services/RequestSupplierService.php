@@ -102,9 +102,8 @@ class RequestSupplierService
                 'status' => 'waiting_supplier',
             ]);
 
-            return collect($requestSuppliers)->load([
-                'requestSupplierSupplier',
-            ]);
+            collect($requestSuppliers)->each->load('requestSupplierSupplier');
+            return collect($requestSuppliers);
         });
     }
 
