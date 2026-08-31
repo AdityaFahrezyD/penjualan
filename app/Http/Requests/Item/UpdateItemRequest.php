@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Item;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -15,21 +15,17 @@ class UpdateItemRequest extends FormRequest
     {
         return [
             'item_name' => [
+                'sometimes',
                 'required',
                 'string',
                 'max:60',
             ],
 
-            'stock' => [
+            'unit_id' => [
+                'sometimes',
                 'required',
-                'integer',
-                'min:0',
-            ],
-
-            'item_price' => [
-                'required',
-                'integer',
-                'min:0',
+                'uuid',
+                'exists:units,unit_id',
             ],
         ];
     }

@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Unit;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreSupplierRequest extends FormRequest
+class StoreUnitRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,22 +14,17 @@ class StoreSupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'supplier_name' => [
+            'unit_name' => [
                 'required',
                 'string',
-                'max:50',
+                'max:20',
             ],
 
-            'phone' => [
+            'unit_code' => [
                 'required',
                 'string',
-                'max:12',
-            ],
-
-            'address' => [
-                'required',
-                'string',
-                'max:60',
+                'size:5',
+                'unique:units,unit_code',
             ],
         ];
     }

@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\SupplierQuotation;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreItemRequest extends FormRequest
+class UpdateDetailSupplierQuotationRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,22 +14,19 @@ class StoreItemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'item_name' => [
+            'unit_price' => [
+                'sometimes',
                 'required',
-                'string',
-                'max:60',
-            ],
-
-            'stock' => [
-                'nullable',
-                'integer',
+                'numeric',
                 'min:0',
             ],
 
-            'item_price' => [
+            'discount_percentage' => [
+                'sometimes',
                 'required',
-                'integer',
+                'numeric',
                 'min:0',
+                'max:100',
             ],
         ];
     }
