@@ -2,58 +2,49 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Supplier;
-use Illuminate\Http\Request;
+use App\Http\Requests\Supplier\StoreSupplierRequest;
+use App\Http\Requests\Supplier\UpdateSupplierRequest;
+use App\Services\SupplierService;
 
 class SupplierController extends Controller
 {
+    public function __construct(
+        protected SupplierService $supplierService
+    ) {}
+
     /**
-     * Menampilkan semua supplier.
+     * Menampilkan seluruh supplier.
      */
     public function index()
     {
-        $suppliers = Supplier::orderBy('supplier_name')->get();
-
         return response()->json([
-            'message' => 'Data supplier berhasil diambil',
-            'data' => $suppliers,
+            'message' => 'Data supplier berhasil diambil.',
+            'data' => $this->supplierService->getAll(),
         ]);
     }
 
     /**
-     * Menampilkan satu supplier.
+     * Menampilkan detail supplier.
      */
     public function show(string $supplier_id)
     {
-        $supplier = Supplier::find($supplier_id);
-
-        if (!$supplier) {
-            return response()->json([
-                'message' => 'Supplier tidak ditemukan',
-            ], 404);
-        }
-
         return response()->json([
-            'message' => 'Data supplier berhasil diambil',
-            'data' => $supplier,
+            'message' => 'Data supplier berhasil diambil.',
+            'data' => $this->supplierService->getById($supplier_id),
         ]);
     }
 
     /**
      * Menambahkan supplier.
      */
-    public function store(Request $request)
+    public function store(StoreSupplierRequest $request)
     {
-        $validated = $request->validate([
-            'supplier_name' => ['required', 'string', 'max:50'],
-            'phone' => ['required', 'string', 'max:12'],
-            'address' => ['required', 'string', 'max:60'],
-        ]);
-
-        $supplier = Supplier::create($validated);
+        $supplier = $this->supplierService->create(
+            $request->validated()
+        );
 
         return response()->json([
-            'message' => 'Supplier berhasil ditambahkan',
+            'message' => 'Supplier berhasil ditambahkan.',
             'data' => $supplier,
         ], 201);
     }
@@ -61,27 +52,18 @@ class SupplierController extends Controller
     /**
      * Mengubah supplier.
      */
-    public function update(Request $request, string $supplier_id)
-    {
-        $supplier = Supplier::find($supplier_id);
-
-        if (!$supplier) {
-            return response()->json([
-                'message' => 'Supplier tidak ditemukan',
-            ], 404);
-        }
-
-        $validated = $request->validate([
-            'supplier_name' => ['required', 'string', 'max:50'],
-            'phone' => ['required', 'string', 'max:12'],
-            'address' => ['required', 'string', 'max:60'],
-        ]);
-
-        $supplier->update($validated);
+    public function update(
+        UpdateSupplierRequest $request,
+        string $supplier_id
+    ) {
+        $supplier = $this->supplierService->update(
+            $supplier_id,
+            $request->validated()
+        );
 
         return response()->json([
-            'message' => 'Supplier berhasil diubah',
-            'data' => $supplier->fresh(),
+            'message' => 'Supplier berhasil diperbarui.',
+            'data' => $supplier,
         ]);
     }
 
@@ -90,18 +72,10 @@ class SupplierController extends Controller
      */
     public function destroy(string $supplier_id)
     {
-        $supplier = Supplier::find($supplier_id);
-
-        if (!$supplier) {
-            return response()->json([
-                'message' => 'Supplier tidak ditemukan',
-            ], 404);
-        }
-
-        $supplier->delete();
+        $this->supplierService->delete($supplier_id);
 
         return response()->json([
-            'message' => 'Supplier berhasil dihapus',
+            'message' => 'Supplier berhasil dihapus.',
         ]);
     }
 }

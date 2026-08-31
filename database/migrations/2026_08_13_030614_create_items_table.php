@@ -15,8 +15,11 @@ return new class extends Migration
             $table->uuid('item_id')->primary();
             $table->string('item_name', 60);
             $table->integer('stock')->default(0);
-            $table->integer('item_price')->default(0);
+            // $table->integer('item_price')->default(0);
+            $table->uuid('unit_id');
             $table->timestamps();
+
+            $table->foreign('unit_id')->references('unit_id')->on('units')->restrictOnUpdate()->restrictOnDelete();
         });
     }
 

@@ -13,10 +13,13 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table) {
             $table->uuid('supplier_id')->primary();
+            $table->uuid('user_id')->unique();
             $table->string('supplier_name', 50);
-            $table->char('phone', 12);
-            $table->string('address', 60);
+            $table->char('phone', 15);
+            $table->string('address', 200);
             $table->timestamps();
+
+            $table->foreign('user_id')->references('id')->on('users')->restrictOnUpdate()->restrictOnDelete();
         });
     }
 
