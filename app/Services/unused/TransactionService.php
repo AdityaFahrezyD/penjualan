@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\unused;
 
 use App\Models\Item;
 use App\Models\msTransaction;
