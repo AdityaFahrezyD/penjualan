@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('detail_supplier_quotations', function (Blueprint $table) {
             $table->uuid('detail_supplier_quotation_id')->primary();
-            $table->uuid('supplier_quotation_id')->unique();
+            $table->uuid('supplier_quotation_id');
             $table->uuid('detail_purchase_request_id');
             // Harga per unit dari supplier
             $table->decimal('unit_price', 15, 2);
@@ -30,7 +30,7 @@ return new class extends Migration
 
             $table->foreign('detail_purchase_request_id')->references('detail_purchase_request_id')->on('detail_purchase_requests')->restrictOnUpdate()->restrictOnDelete();
 
-            $table->unique(['detail_purchase_request_id',]);
+            $table->unique(['detail_purchase_request_id','supplier_quotation_id'], 'quotation_detail_unique');
         });
     }
 
