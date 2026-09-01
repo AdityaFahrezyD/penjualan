@@ -161,6 +161,26 @@ Route::middleware('auth:sanctum')->group(function () {
             'supplier-quotations/{supplier_quotation_id}/details/{detail_supplier_quotation_id}',
             [SupplierQuotationController::class, 'updateDetail']
         );
+
+        Route::get(
+            'purchase-orders',
+            [PurchaseOrderController::class, 'index']
+        );
+
+        Route::get(
+            'purchase-orders/{purchase_order_id}',
+            [PurchaseOrderController::class, 'show']
+        );
+
+        Route::get(
+            'purchase-orders/{purchase_order_id}/payments',
+            [PaymentController::class, 'index']
+        );
+
+        Route::get(
+            'payments/{payment_id}',
+            [PaymentController::class, 'show']
+        );
     });
 });
 
