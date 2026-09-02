@@ -147,7 +147,7 @@ class PurchaseOrderService
              * dari quotation yang dipilih.
              */
             $purchaseOrder = PurchaseOrder::create([
-                'po_number' => $data['po_number'],
+                'po_number' => $this->generatePONumber(),
 
                 'purchase_request_id' =>
                     $purchaseRequest->purchase_request_id,
@@ -401,5 +401,12 @@ class PurchaseOrderService
 
             return $purchaseOrder->fresh();
         });
+    }
+    private function generatePONumber(): string
+    {
+        return 'PO-'
+            . now()->format('Ymd')
+            . '-'
+            . strtoupper(Str::random(6));
     }
 }

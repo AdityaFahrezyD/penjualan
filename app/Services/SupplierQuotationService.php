@@ -8,6 +8,7 @@ use App\Models\RequestSupplier;
 use App\Models\SupplierQuotation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
 class SupplierQuotationService
 {
@@ -153,7 +154,7 @@ class SupplierQuotationService
              */
             $quotation = SupplierQuotation::create([
                 'quotation_number' =>
-                    $data['quotation_number'],
+                    $this->generateQuotationNumber(),
 
                 'request_supplier_id' =>
                     $request_supplier_id,
@@ -506,5 +507,13 @@ class SupplierQuotationService
                 ],
             ]);
         }
+    }
+
+    private function generateQuotationNumber(): string
+    {
+        return 'QR-'
+            . now()->format('Ymd')
+            . '-'
+            . strtoupper(Str::random(6));
     }
 }

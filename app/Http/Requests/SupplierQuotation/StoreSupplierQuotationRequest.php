@@ -14,13 +14,6 @@ class StoreSupplierQuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quotation_number' => [
-                'required',
-                'string',
-                'max:20',
-                'unique:supplier_quotations,quotation_number',
-            ],
-
             'quotation_date' => [
                 'required',
                 'date',

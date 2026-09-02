@@ -28,6 +28,11 @@ class UpdateSupplierQuotationRequest extends FormRequest
                 'min:0',
                 'max:100',
             ],
+            'notes' => [
+                'sometimes',
+                'nullable',
+                'string',
+            ],
         ];
     }
 }

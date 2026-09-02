@@ -14,13 +14,6 @@ class StorePurchaseOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'po_number' => [
-                'required',
-                'string',
-                'max:20',
-                'unique:purchase_orders,po_number',
-            ],
-
             'order_date' => [
                 'required',
                 'date',
