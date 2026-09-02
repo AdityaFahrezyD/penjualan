@@ -71,6 +71,16 @@ Route::middleware('auth:sanctum')->group(function () {
         );
 
         Route::get(
+            'supplier-quotations',
+            [SupplierQuotationController::class, 'index']
+        );
+
+        Route::get(
+            'supplier-quotations/request-suppliers/{request_supplier_id}',
+            [SupplierQuotationController::class, 'show']
+        );
+
+        Route::get(
             'purchase-orders',
             [PurchaseOrderController::class, 'index']
         );
