@@ -26,6 +26,7 @@ class UpdateSupplierQuotationRequest extends FormRequest
                 'required',
                 'numeric',
                 'min:0',
+                'decimal:0,2',
                 'max:100',
             ],
             'notes' => [

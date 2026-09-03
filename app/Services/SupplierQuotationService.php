@@ -7,22 +7,27 @@ use App\Models\DetailSupplierQuotation;
 use App\Models\RequestSupplier;
 use App\Models\SupplierQuotation;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SupplierQuotationService
 {
     /**
-     * Menampilkan seluruh Request Supplier
-     * milik supplier yang sedang login.
+     * Menampilkan seluruh Request Supplier, atau hanya milik supplier
+     * yang sedang login ketika supplier ID diberikan.
      */
-    public function getSupplierRequests(string $supplier_id)
+    public function getSupplierRequests(?string $supplier_id = null)
     {
-        return RequestSupplier::with([
+        $query = RequestSupplier::with([
             'requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
             'requestSupplierSupplierQuotation',
-        ])
-            ->where('supplier_id', $supplier_id)
+        ]);
+
+        if ($supplier_id !== null) {
+            $query->where('supplier_id', $supplier_id);
+        }
+
+        return $query
             ->orderByDesc('sent_at')
             ->get();
     }
@@ -74,6 +79,7 @@ class SupplierQuotationService
                     'supplier_id',
                     $supplier_id
                 )
+                ->lockForUpdate()
                 ->firstOrFail();
 
             /*
@@ -123,7 +129,7 @@ class SupplierQuotationService
              * benar-benar milik Purchase Request.
              */
             foreach ($submittedDetailIds as $detailId) {
-                if (!in_array($detailId, $validDetailIds)) {
+                if (! in_array($detailId, $validDetailIds)) {
                     throw ValidationException::withMessages([
                         'details' => [
                             'Terdapat detail Purchase Request yang tidak valid.',
@@ -141,7 +147,7 @@ class SupplierQuotationService
                 $submittedDetailIds
             );
 
-            if (!empty($missingDetails)) {
+            if (! empty($missingDetails)) {
                 throw ValidationException::withMessages([
                     'details' => [
                         'Quotation harus mencakup seluruh detail item dalam Purchase Request.',
@@ -153,22 +159,17 @@ class SupplierQuotationService
              * Buat quotation header terlebih dahulu.
              */
             $quotation = SupplierQuotation::create([
-                'quotation_number' =>
-                    $this->generateQuotationNumber(),
+                'quotation_number' => $this->generateQuotationNumber(),
 
-                'request_supplier_id' =>
-                    $request_supplier_id,
+                'request_supplier_id' => $request_supplier_id,
 
-                'quotation_date' =>
-                    $data['quotation_date'],
+                'quotation_date' => $data['quotation_date'],
 
-                'valid_until' =>
-                    $data['valid_until'] ?? null,
+                'valid_until' => $data['valid_until'] ?? null,
 
                 'subtotal' => 0,
 
-                'discount_total_percentage' =>
-                    $data['discount_total_percentage'] ?? 0,
+                'discount_total_percentage' => $data['discount_total_percentage'] ?? 0,
 
                 'discount_amount' => 0,
 
@@ -176,8 +177,7 @@ class SupplierQuotationService
 
                 'status' => 'submitted',
 
-                'notes' =>
-                    $data['notes'] ?? null,
+                'notes' => $data['notes'] ?? null,
             ]);
 
             $quotationSubtotal = 0;
@@ -194,94 +194,94 @@ class SupplierQuotationService
                         ]
                     );
 
-                $unitPrice =
-                    (float) $detailData['unit_price'];
+                $unitPrice = $this->money($detailData['unit_price']);
 
-                $discountPercentage =
-                    (float) (
-                        $detailData[
-                            'discount_percentage'
-                        ] ?? 0
-                    );
+                $discountPercentage = (string) (
+                    $detailData[
+                        'discount_percentage'
+                    ] ?? 0
+                );
 
                 /*
                  * Harga sebelum diskon.
                  */
-                $grossAmount =
-                    $purchaseRequestDetail->quantity
-                    * $unitPrice;
+                $grossAmount = bcmul(
+                    (string) $purchaseRequestDetail->quantity,
+                    $unitPrice,
+                    2
+                );
+
+                $this->ensureMoneyFitsColumn($grossAmount, 'details');
 
                 /*
                  * Nominal diskon detail.
                  */
-                $discountAmount =
-                    $grossAmount
-                    * ($discountPercentage / 100);
+                $discountAmount = $this->percentageAmount(
+                    $grossAmount,
+                    $discountPercentage
+                );
 
                 /*
                  * Subtotal detail setelah diskon.
                  */
-                $detailSubtotal =
-                    $grossAmount
-                    - $discountAmount;
+                $detailSubtotal = bcsub($grossAmount, $discountAmount, 2);
 
                 DetailSupplierQuotation::create([
-                    'supplier_quotation_id' =>
-                        $quotation->supplier_quotation_id,
+                    'supplier_quotation_id' => $quotation->supplier_quotation_id,
 
-                    'detail_purchase_request_id' =>
-                        $purchaseRequestDetail
-                            ->detail_purchase_request_id,
+                    'detail_purchase_request_id' => $purchaseRequestDetail
+                        ->detail_purchase_request_id,
 
-                    'unit_price' =>
-                        $unitPrice,
+                    'unit_price' => $unitPrice,
 
-                    'discount_percentage' =>
-                        $discountPercentage,
+                    'discount_percentage' => $discountPercentage,
 
-                    'discount_amount' =>
-                        $discountAmount,
+                    'discount_amount' => $discountAmount,
 
-                    'subtotal' =>
-                        $detailSubtotal,
+                    'subtotal' => $detailSubtotal,
                 ]);
 
-                $quotationSubtotal += $detailSubtotal;
+                $quotationSubtotal = bcadd(
+                    (string) $quotationSubtotal,
+                    $detailSubtotal,
+                    2
+                );
+
+                $this->ensureMoneyFitsColumn($quotationSubtotal, 'details');
             }
 
             /*
              * Hitung diskon total quotation.
              */
-            $totalDiscountPercentage =
-                (float) (
-                    $data[
-                        'discount_total_percentage'
-                    ] ?? 0
-                );
+            $totalDiscountPercentage = (string) (
+                $data[
+                    'discount_total_percentage'
+                ] ?? 0
+            );
 
-            $totalDiscountAmount =
-                $quotationSubtotal
-                * ($totalDiscountPercentage / 100);
+            $totalDiscountAmount = $this->percentageAmount(
+                (string) $quotationSubtotal,
+                $totalDiscountPercentage
+            );
 
             /*
              * Hitung total akhir.
              */
-            $quotationTotal =
-                $quotationSubtotal
-                - $totalDiscountAmount;
+            $quotationTotal = bcsub(
+                (string) $quotationSubtotal,
+                $totalDiscountAmount,
+                2
+            );
 
             /*
              * Update nilai perhitungan quotation.
              */
             $quotation->update([
-                'subtotal' =>
-                    $quotationSubtotal,
+                'subtotal' => $quotationSubtotal,
 
-                'discount_amount' =>
-                    $totalDiscountAmount,
+                'discount_amount' => $totalDiscountAmount,
 
-                'total' =>
-                    $quotationTotal,
+                'total' => $quotationTotal,
             ]);
 
             /*
@@ -320,6 +320,18 @@ class SupplierQuotationService
             );
 
             $this->ensureQuotationEditable($quotation);
+
+            if (
+                isset($data['valid_until']) &&
+                $data['valid_until'] !== null &&
+                $quotation->quotation_date->isAfter($data['valid_until'])
+            ) {
+                throw ValidationException::withMessages([
+                    'valid_until' => [
+                        'Tanggal berlaku harus sama dengan atau setelah tanggal quotation.',
+                    ],
+                ]);
+            }
 
             $quotation->update($data);
 
@@ -399,20 +411,22 @@ class SupplierQuotationService
             /*
             * Harga kotor.
             */
-            $grossAmount = $quantity * $unitPrice;
+            $grossAmount = bcmul((string) $quantity, (string) $unitPrice, 2);
+
+            $this->ensureMoneyFitsColumn($grossAmount, 'unit_price');
 
             /*
             * Diskon detail.
             */
-            $discountAmount =
-                $grossAmount
-                * ($discountPercentage / 100);
+            $discountAmount = $this->percentageAmount(
+                $grossAmount,
+                (string) $discountPercentage
+            );
 
             /*
             * Subtotal setelah diskon.
             */
-            $subtotal =
-                $grossAmount - $discountAmount;
+            $subtotal = bcsub($grossAmount, $discountAmount, 2);
 
             $detail->update([
                 'discount_amount' => $discountAmount,
@@ -442,7 +456,12 @@ class SupplierQuotationService
         /*
         * Total seluruh subtotal detail.
         */
-        $subtotal = $details->sum('subtotal');
+        $subtotal = $details->reduce(
+            fn (string $total, DetailSupplierQuotation $detail): string => bcadd($total, (string) $detail->subtotal, 2),
+            '0.00'
+        );
+
+        $this->ensureMoneyFitsColumn($subtotal, 'details');
 
         /*
         * Diskon tambahan di level header.
@@ -450,15 +469,15 @@ class SupplierQuotationService
         $discountPercentage =
             $quotation->discount_total_percentage ?? 0;
 
-        $discountAmount =
-            $subtotal
-            * ($discountPercentage / 100);
+        $discountAmount = $this->percentageAmount(
+            $subtotal,
+            (string) $discountPercentage
+        );
 
         /*
         * Total akhir quotation.
         */
-        $total =
-            $subtotal - $discountAmount;
+        $total = bcsub($subtotal, $discountAmount, 2);
 
         $quotation->update([
             'subtotal' => $subtotal,
@@ -489,7 +508,7 @@ class SupplierQuotationService
             'cancelled',
         ];
 
-        if (in_array($quotation->status, $lockedStatuses)) {
+        if (in_array($quotation->status, $lockedStatuses, true)) {
             throw ValidationException::withMessages([
                 'supplier_quotation' => [
                     'Quotation tidak dapat diperbarui.',
@@ -499,7 +518,7 @@ class SupplierQuotationService
 
         if (
             $quotation->valid_until !== null &&
-            $quotation->valid_until->isPast()
+            $quotation->valid_until->isBefore(today())
         ) {
             throw ValidationException::withMessages([
                 'supplier_quotation' => [
@@ -512,8 +531,29 @@ class SupplierQuotationService
     private function generateQuotationNumber(): string
     {
         return 'QR-'
-            . now()->format('Ymd')
-            . '-'
-            . strtoupper(Str::random(6));
+            .now()->format('Ymd')
+            .'-'
+            .strtoupper(Str::random(6));
+    }
+
+    private function money(string|int|float $value): string
+    {
+        return bcadd((string) $value, '0', 2);
+    }
+
+    private function percentageAmount(string $amount, string $percentage): string
+    {
+        $unrounded = bcdiv(bcmul($amount, $percentage, 4), '100', 4);
+
+        return bcadd($unrounded, '0.005', 2);
+    }
+
+    private function ensureMoneyFitsColumn(string $amount, string $field): void
+    {
+        if (bccomp($amount, '9999999999999.99', 2) === 1) {
+            throw ValidationException::withMessages([
+                $field => ['Nilai quotation melebihi batas yang dapat disimpan.'],
+            ]);
+        }
     }
 }

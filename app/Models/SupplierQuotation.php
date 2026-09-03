@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class SupplierQuotation extends Model
 {
     use HasUuids;
 
     protected $primaryKey = 'supplier_quotation_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -29,6 +31,10 @@ class SupplierQuotation extends Model
     protected $casts = [
         'quotation_date' => 'date',
         'valid_until' => 'date',
+        'subtotal' => 'decimal:2',
+        'discount_total_percentage' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'total' => 'decimal:2',
     ];
 
     public function supplierQuotationRequestSupplier()
@@ -43,6 +49,6 @@ class SupplierQuotation extends Model
 
     public function supplierQuotationDetailSupplierQuotation()
     {
-        return $this->hasMany(DetailSupplierQuotation::class,'supplier_quotation_id','supplier_quotation_id');
+        return $this->hasMany(DetailSupplierQuotation::class, 'supplier_quotation_id', 'supplier_quotation_id');
     }
 }

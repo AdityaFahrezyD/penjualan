@@ -29,6 +29,7 @@ class StoreSupplierQuotationRequest extends FormRequest
                 'nullable',
                 'numeric',
                 'min:0',
+                'decimal:0,2',
                 'max:100',
             ],
 
@@ -54,12 +55,15 @@ class StoreSupplierQuotationRequest extends FormRequest
                 'required',
                 'numeric',
                 'min:0',
+                'decimal:0,2',
+                'max:9999999999999.99',
             ],
 
             'details.*.discount_percentage' => [
                 'nullable',
                 'numeric',
                 'min:0',
+                'decimal:0,2',
                 'max:100',
             ],
         ];

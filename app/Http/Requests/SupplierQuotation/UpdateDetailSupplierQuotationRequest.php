@@ -19,6 +19,8 @@ class UpdateDetailSupplierQuotationRequest extends FormRequest
                 'required',
                 'numeric',
                 'min:0',
+                'decimal:0,2',
+                'max:9999999999999.99',
             ],
 
             'discount_percentage' => [
@@ -26,6 +28,7 @@ class UpdateDetailSupplierQuotationRequest extends FormRequest
                 'required',
                 'numeric',
                 'min:0',
+                'decimal:0,2',
                 'max:100',
             ],
         ];
