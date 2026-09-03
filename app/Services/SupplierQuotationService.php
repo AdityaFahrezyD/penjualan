@@ -19,7 +19,7 @@ class SupplierQuotationService
     public function getSupplierRequests(?string $supplier_id = null)
     {
         $query = RequestSupplier::with([
-            'requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
+            'requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem.itemUnit',
             'requestSupplierSupplierQuotation',
         ]);
 
@@ -40,8 +40,8 @@ class SupplierQuotationService
         ?string $supplier_id = null
     ): RequestSupplier {
         $query = RequestSupplier::with([
-            'requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
-            'requestSupplierSupplierQuotation.supplierQuotationDetailSupplierQuotation.detailSupplierQuotationPurchaseRequestDetail.detailPurchaseRequestItem',
+            'requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem.itemUnit',
+            'requestSupplierSupplierQuotation.supplierQuotationDetailSupplierQuotation.detailSupplierQuotationPurchaseRequestDetail.detailPurchaseRequestItem.itemUnit',
         ])->where('request_supplier_id', $request_supplier_id);
 
         if ($supplier_id !== null) {
@@ -289,7 +289,7 @@ class SupplierQuotationService
              */
             return $quotation->fresh()->load([
                 'supplierQuotationRequestSupplier.requestSupplierPurchaseRequest',
-                'supplierQuotationDetailSupplierQuotation.detailSupplierQuotationPurchaseRequestDetail.detailPurchaseRequestItem',
+                'supplierQuotationDetailSupplierQuotation.detailSupplierQuotationPurchaseRequestDetail.detailPurchaseRequestItem.itemUnit',
             ]);
         });
     }
