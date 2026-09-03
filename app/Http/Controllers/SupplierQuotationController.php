@@ -20,9 +20,15 @@ class SupplierQuotationController extends Controller
      */
     public function index(Request $request)
     {
-        $supplierId = $request->user()
-            ->userSupplier
-            ->supplier_id;
+        $supplierId = $request->user()->role === 'supplier'
+            ? $request->user()->userSupplier?->supplier_id
+            : null;
+
+        abort_if(
+            $request->user()->role === 'supplier' && $supplierId === null,
+            403,
+            'Akun supplier tidak terhubung dengan data supplier.'
+        );
 
         return response()->json([
             'message' => 'Data Request Supplier berhasil diambil.',
@@ -59,9 +65,9 @@ class SupplierQuotationController extends Controller
         StoreSupplierQuotationRequest $request,
         string $request_supplier_id
     ) {
-        $supplierId = $request->user()
-            ->userSupplier
-            ->supplier_id;
+        $supplierId = $request->user()->userSupplier?->supplier_id;
+
+        abort_if($supplierId === null, 403, 'Akun supplier tidak terhubung dengan data supplier.');
 
         return response()->json([
             'message' => 'Supplier Quotation berhasil dibuat.',
@@ -83,12 +89,11 @@ class SupplierQuotationController extends Controller
      */
     public function updateHeader(
         UpdateSupplierQuotationRequest $request,
-        Request $httpRequest,
         string $supplier_quotation_id
     ) {
-        $supplierId = $httpRequest->user()
-            ->userSupplier
-            ->supplier_id;
+        $supplierId = $request->user()->userSupplier?->supplier_id;
+
+        abort_if($supplierId === null, 403, 'Akun supplier tidak terhubung dengan data supplier.');
 
         return response()->json([
             'message' => 'Header Supplier Quotation berhasil diperbarui.',
@@ -110,13 +115,12 @@ class SupplierQuotationController extends Controller
      */
     public function updateDetail(
         UpdateDetailSupplierQuotationRequest $request,
-        Request $httpRequest,
         string $supplier_quotation_id,
         string $detail_supplier_quotation_id
     ) {
-        $supplierId = $httpRequest->user()
-            ->userSupplier
-            ->supplier_id;
+        $supplierId = $request->user()->userSupplier?->supplier_id;
+
+        abort_if($supplierId === null, 403, 'Akun supplier tidak terhubung dengan data supplier.');
 
         return response()->json([
             'message' => 'Detail Supplier Quotation berhasil diperbarui.',
