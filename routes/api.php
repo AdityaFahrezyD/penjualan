@@ -18,6 +18,33 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    Route::middleware('role:admin,akuntan,supplier')->group(function () {
+        Route::get(
+            'supplier-quotations',
+            [SupplierQuotationController::class, 'index']
+        );
+
+        Route::get(
+            'supplier-quotations/request-suppliers/{request_supplier_id}',
+            [SupplierQuotationController::class, 'show']
+        );
+
+        Route::get(
+            'purchase-orders',
+            [PurchaseOrderController::class, 'index']
+        );
+
+        Route::get(
+            'purchase-orders/{purchase_order_id}',
+            [PurchaseOrderController::class, 'show']
+        );
+
+        Route::get(
+            'purchase-orders/{purchase_order_id}/payments',
+            [PaymentController::class, 'index']
+        );
+    });
+
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('users', UserController::class);
 
@@ -70,26 +97,6 @@ Route::middleware('auth:sanctum')->group(function () {
             [RequestSupplierController::class, 'store']
         );
 
-        Route::get(
-            'supplier-quotations',
-            [SupplierQuotationController::class, 'index']
-        );
-
-        Route::get(
-            'supplier-quotations/request-suppliers/{request_supplier_id}',
-            [SupplierQuotationController::class, 'show']
-        );
-
-        Route::get(
-            'purchase-orders',
-            [PurchaseOrderController::class, 'index']
-        );
-
-        Route::get(
-            'purchase-orders/{purchase_order_id}',
-            [PurchaseOrderController::class, 'show']
-        );
-
         Route::post(
             'supplier-quotations/{supplier_quotation_id}/purchase-order',
             [PurchaseOrderController::class, 'store']
@@ -103,11 +110,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch(
             'purchase-orders/{purchase_order_id}/status',
             [PurchaseOrderController::class, 'updateStatus']
-        );
-
-        Route::get(
-            'purchase-orders/{purchase_order_id}/payments',
-            [PaymentController::class, 'index']
         );
 
         Route::post(
@@ -147,16 +149,6 @@ Route::middleware('auth:sanctum')->group(function () {
             [RequestSupplierController::class, 'respond']
         );
 
-        Route::get(
-            'supplier-quotations',
-            [SupplierQuotationController::class, 'index']
-        );
-
-        Route::get(
-            'supplier-quotations/request-suppliers/{request_supplier_id}',
-            [SupplierQuotationController::class, 'show']
-        );
-
         Route::post(
             'supplier-quotations/request-suppliers/{request_supplier_id}',
             [SupplierQuotationController::class, 'store']
@@ -173,25 +165,8 @@ Route::middleware('auth:sanctum')->group(function () {
         );
 
         Route::get(
-            'purchase-orders',
-            [PurchaseOrderController::class, 'index']
-        );
-
-        Route::get(
-            'purchase-orders/{purchase_order_id}',
-            [PurchaseOrderController::class, 'show']
-        );
-
-        Route::get(
-            'purchase-orders/{purchase_order_id}/payments',
-            [PaymentController::class, 'index']
-        );
-
-        Route::get(
             'payments/{payment_id}',
             [PaymentController::class, 'show']
         );
     });
 });
-
-
