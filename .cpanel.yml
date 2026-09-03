@@ -2,4 +2,8 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/knjsnjuv/public_html/
+    - export APPPATH=/home/knjsnjuv/repositories/penjualan
+    - /usr/local/bin/ea-php83 $APPPATH/artisan migrate --force
+    - /usr/local/bin/ea-php83 $APPPATH/artisan config:clear
+    - /usr/local/bin/ea-php83 $APPPATH/artisan config:cache
     - /bin/cp -R public/. $DEPLOYPATH
