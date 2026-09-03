@@ -308,11 +308,15 @@ class PurchaseOrderService
      */
     public function updateStatus(
         string $purchase_order_id,
-        string $status
+        string $status,
+        string $role,
+        ?string $supplier_id = null
     ): PurchaseOrder {
         return DB::transaction(function () use (
             $purchase_order_id,
-            $status
+            $status,
+            $role,
+            $supplier_id
         ) {
             $purchaseOrder = PurchaseOrder::with([
                 'purchaseOrderDetailPurchaseOrder.detailPurchaseOrderItem',
@@ -320,45 +324,25 @@ class PurchaseOrderService
                 ->lockForUpdate()
                 ->findOrFail($purchase_order_id);
 
-            $allowedTransitions = [
-                'draft' => [
-                    'sent',
-                    'cancelled',
-                ],
-
-                'sent' => [
-                    'accepted',
-                    'failed',
-                    'cancelled',
-                ],
-
-                'accepted' => [
-                    'shipping',
-                    'cancelled',
-                ],
-
-                'shipping' => [
-                    'delivered',
-                    'failed',
-                ],
-
-                'delivered' => [
-                    'completed',
-                ],
-            ];
-
             $currentStatus = $purchaseOrder->status;
 
-            if (
-                !isset($allowedTransitions[$currentStatus]) ||
-                !in_array(
-                    $status,
-                    $allowedTransitions[$currentStatus]
-                )
-            ) {
+            if ($role === 'supplier') {
+                if ($supplier_id === null || $purchaseOrder->supplier_id !== $supplier_id) {
+                    abort(403, 'Anda tidak memiliki akses ke Purchase Order ini.');
+                }
+
+                $allowed = in_array($currentStatus, ['draft', 'sent', 'accepted'], true)
+                    && $status === 'shipping';
+            } else {
+                $allowed = in_array($role, ['admin', 'akuntan'], true)
+                    && $currentStatus === 'shipping'
+                    && $status === 'delivered';
+            }
+
+            if (! $allowed) {
                 throw ValidationException::withMessages([
                     'status' => [
-                        "Status tidak dapat diubah dari {$currentStatus} ke {$status}.",
+                        'Supplier hanya dapat mengubah status menjadi Dikirim, sedangkan Admin/Akuntan hanya dapat mengubah status menjadi Barang Diterima.',
                     ],
                 ]);
             }
@@ -378,22 +362,6 @@ class PurchaseOrderService
                             $detail->quantity
                         );
                 }
-            }
-
-            /**
-             * Completed berarti:
-             * - Barang sudah delivered
-             * - Payment sudah lunas
-             */
-            if (
-                $status === 'completed' &&
-                $purchaseOrder->payment_status !== 'paid'
-            ) {
-                throw ValidationException::withMessages([
-                    'purchase_order' => [
-                        'Purchase Order belum dapat diselesaikan karena pembayaran belum lunas.',
-                    ],
-                ]);
             }
 
             $purchaseOrder->update([

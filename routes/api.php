@@ -43,6 +43,11 @@ Route::middleware('auth:sanctum')->group(function () {
             'purchase-orders/{purchase_order_id}/payments',
             [PaymentController::class, 'index']
         );
+
+        Route::patch(
+            'purchase-orders/{purchase_order_id}/status',
+            [PurchaseOrderController::class, 'updateStatus']
+        );
     });
 
     Route::middleware('role:admin')->group(function () {
@@ -105,11 +110,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch(
             'purchase-orders/{purchase_order_id}',
             [PurchaseOrderController::class, 'update']
-        );
-
-        Route::patch(
-            'purchase-orders/{purchase_order_id}/status',
-            [PurchaseOrderController::class, 'updateStatus']
         );
 
         Route::post(

@@ -81,7 +81,9 @@ class PurchaseOrderController extends Controller
             'message' => 'Status Purchase Order berhasil diperbarui.',
             'data' => $this->purchaseOrderService->updateStatus(
                 $purchase_order_id,
-                $request->validated()['status']
+                $request->validated()['status'],
+                $request->user()->role,
+                $request->user()->userSupplier?->supplier_id
             ),
         ]);
     }
