@@ -7,6 +7,7 @@ use App\Models\PurchaseRequest;
 use App\Models\RequestSupplier;
 use App\Models\SupplierQuotation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderService
