@@ -32,18 +32,18 @@ class SupplierQuotationService
      */
     public function getRequestDetail(
         string $request_supplier_id,
-        string $supplier_id
+        ?string $supplier_id = null
     ): RequestSupplier {
-        return RequestSupplier::with([
+        $query = RequestSupplier::with([
             'requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest.detailPurchaseRequestItem',
-            'requestSupplierSupplierQuotation',
-        ])
-            ->where(
-                'request_supplier_id',
-                $request_supplier_id
-            )
-            ->where('supplier_id', $supplier_id)
-            ->firstOrFail();
+            'requestSupplierSupplierQuotation.supplierQuotationDetailSupplierQuotation.detailSupplierQuotationPurchaseRequestDetail.detailPurchaseRequestItem',
+        ])->where('request_supplier_id', $request_supplier_id);
+
+        if ($supplier_id !== null) {
+            $query->where('supplier_id', $supplier_id);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**

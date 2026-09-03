@@ -39,9 +39,7 @@ class SupplierQuotationController extends Controller
         Request $request,
         string $request_supplier_id
     ) {
-        $supplierId = $request->user()
-            ->userSupplier
-            ->supplier_id;
+        $supplierId = $request->user()->userSupplier?->supplier_id;
 
         return response()->json([
             'message' => 'Detail Request Supplier berhasil diambil.',
