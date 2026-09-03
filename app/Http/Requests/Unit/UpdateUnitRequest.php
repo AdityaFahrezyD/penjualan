@@ -28,7 +28,7 @@ class UpdateUnitRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                'size:5',
+                'between:2,3',
                 Rule::unique('units', 'unit_code')
                     ->ignore($unitId, 'unit_id'),
             ],
