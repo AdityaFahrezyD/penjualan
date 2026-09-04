@@ -13,22 +13,22 @@ class UserSeeder extends Seeder
     {
         User::create([
             'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password'),
+            'email' => 'admin@procurement-api.my.id',
+            'password' => Hash::make('Q(?6%87U,SfgvRCK'),
             'role' => 'admin',
         ]);
 
         User::create([
             'name' => 'Akuntan',
-            'email' => 'akuntan@example.com',
-            'password' => Hash::make('password'),
+            'email' => 'akuntan@procurement-api.my.id',
+            'password' => Hash::make('yA-qv]~s}w]TqQ*}'),
             'role' => 'akuntan',
         ]);
-        User::create([
-            'name' => 'Supplier',
-            'email' => 'supplier@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'akuntan',
-        ]);
+        // User::create([
+        //     'name' => 'Supplier',
+        //     'email' => 'supplier@example.com',
+        //     'password' => Hash::make('password'),
+        //     'role' => 'akuntan',
+        // ]);
     }
 }
