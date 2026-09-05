@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PurchaseOrderController;
@@ -9,16 +10,15 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierQuotationController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
-
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('role:admin,akuntan,supplier')->group(function () {
+        Route::get('units', [UnitController::class, 'index']);
         Route::get(
             'supplier-quotations',
             [SupplierQuotationController::class, 'index']
@@ -55,7 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('suppliers', SupplierController::class);
 
-        Route::apiResource('units', UnitController::class);
+        Route::apiResource('units', UnitController::class)->except(['index']);
 
         Route::apiResource('items', ItemController::class);
 
@@ -144,6 +144,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware('role:supplier')->group(function () {
+        Route::patch('purchase-orders/{purchase_order_id}/delivery-estimate', [PurchaseOrderController::class, 'updateDeliveryEstimate']);
+        Route::post('supplier-quotations/{supplier_quotation_id}/details', [SupplierQuotationController::class, 'addDetail']);
+        Route::delete('supplier-quotations/{supplier_quotation_id}/details/{detail_supplier_quotation_id}', [SupplierQuotationController::class, 'deleteDetail']);
         Route::patch(
             'request-suppliers/{request_supplier_id}/respond',
             [RequestSupplierController::class, 'respond']

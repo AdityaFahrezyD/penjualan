@@ -2,24 +2,28 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrder extends Model
 {
     use HasUuids;
 
     protected $primaryKey = 'purchase_order_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
+        'quantity_difference_accepted',
         'po_number',
         'purchase_request_id',
         'supplier_id',
         'supplier_quotation_id',
         'created_by',
         'order_date',
+        'shipping_date',
         'expected_delivery_date',
         'subtotal',
         'discount_total_percentage',
@@ -31,7 +35,9 @@ class PurchaseOrder extends Model
     ];
 
     protected $casts = [
+        'quantity_difference_accepted' => 'boolean',
         'order_date' => 'date',
+        'shipping_date' => 'date',
         'expected_delivery_date' => 'date',
     ];
 
@@ -64,5 +70,4 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(Payment::class, 'purchase_order_id', 'purchase_order_id');
     }
-
 }

@@ -15,6 +15,8 @@ class SupplierQuotation extends Model
 
     public $incrementing = false;
 
+    protected $appends = ['quantity_summary'];
+
     protected $fillable = [
         'quotation_number',
         'request_supplier_id',
@@ -50,5 +52,31 @@ class SupplierQuotation extends Model
     public function supplierQuotationDetailSupplierQuotation()
     {
         return $this->hasMany(DetailSupplierQuotation::class, 'supplier_quotation_id', 'supplier_quotation_id');
+    }
+
+    public function getQuantitySummaryAttribute(): array
+    {
+        $this->loadMissing([
+            'supplierQuotationRequestSupplier.requestSupplierPurchaseRequest.purchaseRequestDetailPurchaseRequest',
+            'supplierQuotationDetailSupplierQuotation',
+        ]);
+        $details = $this->supplierQuotationDetailSupplierQuotation;
+
+        return $this->supplierQuotationRequestSupplier->requestSupplierPurchaseRequest
+            ->purchaseRequestDetailPurchaseRequest->map(function ($request) use ($details) {
+                $offered = $details->where('detail_purchase_request_id', $request->detail_purchase_request_id)
+                    ->reduce(fn ($sum, $line) => bcadd($sum, (string) $line->base_quantity, 0), '0');
+                $difference = bcsub($offered, (string) $request->quantity, 0);
+
+                return [
+                    'detail_purchase_request_id' => $request->detail_purchase_request_id,
+                    'item_id' => $request->item_id,
+                    'base_unit_id' => $request->base_unit_id,
+                    'requested_quantity' => (int) $request->quantity,
+                    'offered_quantity' => (int) $offered,
+                    'difference' => (int) $difference,
+                    'status' => bccomp($difference, '0', 0) === 0 ? 'exact' : (bccomp($difference, '0', 0) > 0 ? 'over' : 'under'),
+                ];
+            })->all();
     }
 }

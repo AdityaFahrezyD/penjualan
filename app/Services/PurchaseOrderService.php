@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\RequestSupplier;
 use App\Models\SupplierQuotation;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -85,7 +88,7 @@ class PurchaseOrderService
              */
             if (
                 $quotation->valid_until !== null &&
-                $quotation->valid_until->isPast()
+                $quotation->valid_until->isBefore(today())
             ) {
                 throw ValidationException::withMessages([
                     'supplier_quotation' => [
@@ -147,47 +150,43 @@ class PurchaseOrderService
              * Buat Purchase Order header sebagai snapshot
              * dari quotation yang dipilih.
              */
+            $hasDifference = collect($quotation->quantity_summary)->contains(fn ($row) => $row['difference'] !== 0);
+            if ($hasDifference && ! ($data['accept_quantity_difference'] ?? false)) {
+                throw ValidationException::withMessages([
+                    'accept_quantity_difference' => ['Jumlah penawaran berbeda dari kebutuhan PR. Periksa quantity_summary dan konfirmasi selisih sebelum membuat PO.'],
+                ]);
+            }
+
             $purchaseOrder = PurchaseOrder::create([
+                'quantity_difference_accepted' => $hasDifference,
                 'po_number' => $this->generatePONumber(),
 
-                'purchase_request_id' =>
-                    $purchaseRequest->purchase_request_id,
+                'purchase_request_id' => $purchaseRequest->purchase_request_id,
 
-                'supplier_id' =>
-                    $requestSupplier->supplier_id,
+                'supplier_id' => $requestSupplier->supplier_id,
 
-                'supplier_quotation_id' =>
-                    $quotation->supplier_quotation_id,
+                'supplier_quotation_id' => $quotation->supplier_quotation_id,
 
-                'created_by' =>
-                    $user_id,
+                'created_by' => $user_id,
 
-                'order_date' =>
-                    $data['order_date'],
+                'order_date' => $data['order_date'],
 
-                'expected_delivery_date' =>
-                    $data['expected_delivery_date'] ?? null,
+                'shipping_date' => null,
+                'expected_delivery_date' => null,
 
-                'subtotal' =>
-                    $quotation->subtotal,
+                'subtotal' => $quotation->subtotal,
 
-                'discount_total_percentage' =>
-                    $quotation->discount_total_percentage,
+                'discount_total_percentage' => $quotation->discount_total_percentage,
 
-                'discount_amount' =>
-                    $quotation->discount_amount,
+                'discount_amount' => $quotation->discount_amount,
 
-                'total' =>
-                    $quotation->total,
+                'total' => $quotation->total,
 
-                'status' =>
-                    'draft',
+                'status' => 'draft',
 
-                'payment_status' =>
-                    'unpaid',
+                'payment_status' => 'unpaid',
 
-                'notes' =>
-                    $data['notes'] ?? null,
+                'notes' => $data['notes'] ?? null,
             ]);
 
             /**
@@ -195,8 +194,7 @@ class PurchaseOrderService
              * menjadi Detail Purchase Order.
              */
             foreach (
-                $quotation->supplierQuotationDetailSupplierQuotation
-                as $quotationDetail
+                $quotation->supplierQuotationDetailSupplierQuotation as $quotationDetail
             ) {
                 $purchaseRequestDetail =
                     $quotationDetail
@@ -205,23 +203,23 @@ class PurchaseOrderService
                 $purchaseOrder
                     ->purchaseOrderDetailPurchaseOrder()
                     ->create([
-                        'item_id' =>
-                            $purchaseRequestDetail->item_id,
+                        'item_id' => $purchaseRequestDetail->item_id,
 
-                        'quantity' =>
-                            $purchaseRequestDetail->quantity,
+                        'quantity' => $quotationDetail->quantity,
 
-                        'unit_price' =>
-                            $quotationDetail->unit_price,
+                        'detail_purchase_request_id' => $purchaseRequestDetail->detail_purchase_request_id,
+                        'unit_id' => $quotationDetail->unit_id,
+                        'base_unit_id' => $quotationDetail->base_unit_id,
+                        'conversion_qty' => $quotationDetail->conversion_qty,
+                        'base_quantity' => $quotationDetail->base_quantity,
 
-                        'discount_percentage' =>
-                            $quotationDetail->discount_percentage,
+                        'unit_price' => $quotationDetail->unit_price,
 
-                        'discount_amount' =>
-                            $quotationDetail->discount_amount,
+                        'discount_percentage' => $quotationDetail->discount_percentage,
 
-                        'subtotal' =>
-                            $quotationDetail->subtotal,
+                        'discount_amount' => $quotationDetail->discount_amount,
+
+                        'subtotal' => $quotationDetail->subtotal,
                     ]);
             }
 
@@ -298,7 +296,7 @@ class PurchaseOrderService
             ]);
         }
 
-        $purchaseOrder->update($data);
+        $purchaseOrder->update(Arr::only($data, ['notes']));
 
         return $purchaseOrder->fresh();
     }
@@ -310,13 +308,15 @@ class PurchaseOrderService
         string $purchase_order_id,
         string $status,
         string $role,
-        ?string $supplier_id = null
+        ?string $supplier_id = null,
+        array $data = []
     ): PurchaseOrder {
         return DB::transaction(function () use (
             $purchase_order_id,
             $status,
             $role,
-            $supplier_id
+            $supplier_id,
+            $data
         ) {
             $purchaseOrder = PurchaseOrder::with([
                 'purchaseOrderDetailPurchaseOrder.detailPurchaseOrderItem',
@@ -347,19 +347,36 @@ class PurchaseOrderService
                 ]);
             }
 
+            if ($status === 'shipping') {
+                $dates = Validator::make($data, [
+                    'shipping_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$purchaseOrder->order_date->toDateString(), 'before_or_equal:today'],
+                    'expected_delivery_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:shipping_date'],
+                ])->validate();
+                $purchaseOrder->fill($dates);
+            }
+
             /**
              * Stock bertambah ketika barang
              * benar-benar delivered.
              */
             if ($status === 'delivered') {
+                // Lock items in a stable order and check the sum of all packaging rows.
+                $totals = $purchaseOrder->purchaseOrderDetailPurchaseOrder->groupBy('item_id')->sortKeys();
+                foreach ($totals as $itemId => $lines) {
+                    $item = Item::lockForUpdate()->findOrFail($itemId);
+                    $added = $lines->reduce(fn ($sum, $line) => bcadd($sum, (string) $line->base_quantity, 0), '0');
+                    if ($lines->contains(fn ($line) => $line->base_unit_id !== $item->unit_id)
+                        || bccomp(bcadd((string) $item->stock, $added, 0), '2147483647', 0) > 0) {
+                        throw ValidationException::withMessages(['stock' => ['Satuan stok berubah atau stok melebihi kapasitas.']]);
+                    }
+                }
                 foreach (
-                    $purchaseOrder->purchaseOrderDetailPurchaseOrder
-                    as $detail
+                    $purchaseOrder->purchaseOrderDetailPurchaseOrder as $detail
                 ) {
                     $detail->detailPurchaseOrderItem()
                         ->increment(
                             'stock',
-                            $detail->quantity
+                            $detail->base_quantity
                         );
                 }
             }
@@ -371,11 +388,31 @@ class PurchaseOrderService
             return $purchaseOrder->fresh();
         });
     }
+
+    public function updateDeliveryEstimate(string $purchaseOrderId, string $supplierId, array $data): PurchaseOrder
+    {
+        return DB::transaction(function () use ($purchaseOrderId, $supplierId, $data) {
+            $po = PurchaseOrder::lockForUpdate()->findOrFail($purchaseOrderId);
+            abort_if($po->supplier_id !== $supplierId, 403, 'Anda tidak memiliki akses ke Purchase Order ini.');
+            if ($po->status !== 'shipping' || $po->shipping_date === null) {
+                throw ValidationException::withMessages([
+                    'purchase_order' => ['Estimasi hanya dapat diperbarui untuk PO yang sedang dikirim dan memiliki tanggal pengiriman.'],
+                ]);
+            }
+            $dates = Validator::make($data, [
+                'expected_delivery_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$po->shipping_date->toDateString()],
+            ])->validate();
+            $po->update($dates);
+
+            return $po->fresh();
+        });
+    }
+
     private function generatePONumber(): string
     {
         return 'PO-'
-            . now()->format('Ymd')
-            . '-'
-            . strtoupper(Str::random(6));
+            .now()->format('Ymd')
+            .'-'
+            .strtoupper(Str::random(6));
     }
 }

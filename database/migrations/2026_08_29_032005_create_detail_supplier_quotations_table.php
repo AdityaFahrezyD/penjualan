@@ -15,6 +15,11 @@ return new class extends Migration
             $table->uuid('detail_supplier_quotation_id')->primary();
             $table->uuid('supplier_quotation_id');
             $table->uuid('detail_purchase_request_id');
+            $table->foreignUuid('unit_id')->nullable()->constrained('units', 'unit_id')->restrictOnDelete();
+            $table->foreignUuid('base_unit_id')->nullable()->constrained('units', 'unit_id')->restrictOnDelete();
+            $table->unsignedInteger('quantity')->default(1);
+            $table->unsignedInteger('conversion_qty')->default(1);
+            $table->unsignedInteger('base_quantity')->default(0);
             // Harga per unit dari supplier
             $table->decimal('unit_price', 15, 2);
             // Supplier memasukkan angka 0–100
@@ -30,7 +35,7 @@ return new class extends Migration
 
             $table->foreign('detail_purchase_request_id')->references('detail_purchase_request_id')->on('detail_purchase_requests')->restrictOnUpdate()->restrictOnDelete();
 
-            $table->unique(['detail_purchase_request_id','supplier_quotation_id'], 'quotation_detail_unique');
+            $table->index('detail_purchase_request_id', 'quotation_pr_detail_index');
         });
     }
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Item;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ItemService
@@ -30,19 +31,25 @@ class ItemService
         ])->load('itemUnit');
     }
 
-    public function update(string $item_id,array $data): Item 
+    public function update(string $item_id, array $data): Item
     {
-        $item = Item::findOrFail($item_id);
+        return DB::transaction(function () use ($item_id, $data) {
+            $item = Item::lockForUpdate()->findOrFail($item_id);
+            if (isset($data['unit_id']) && $data['unit_id'] !== $item->unit_id
+                && ($item->stock != 0 || $item->itemDetailPurchaseRequest()->exists() || $item->itemDetailPurchaseOrder()->exists())) {
+                throw ValidationException::withMessages(['unit_id' => ['Satuan dasar tidak dapat diubah setelah memiliki stok atau transaksi.']]);
+            }
 
-        $item->update([
-            'item_name' => $data['item_name']
-                ?? $item->item_name,
+            $item->update([
+                'item_name' => $data['item_name']
+                    ?? $item->item_name,
 
-            'unit_id' => $data['unit_id']
-                ?? $item->unit_id,
-        ]);
+                'unit_id' => $data['unit_id']
+                    ?? $item->unit_id,
+            ]);
 
-        return $item->fresh()->load('itemUnit');
+            return $item->fresh()->load('itemUnit');
+        });
     }
 
     public function delete(string $item_id): void

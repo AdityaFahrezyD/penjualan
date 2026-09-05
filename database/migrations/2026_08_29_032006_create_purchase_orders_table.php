@@ -19,16 +19,18 @@ return new class extends Migration
             $table->uuid('supplier_quotation_id');
             $table->uuid('created_by');
             $table->date('order_date');
+            $table->date('shipping_date')->nullable();
             $table->date('expected_delivery_date')->nullable();
             $table->decimal('subtotal', 15, 2)->default(0);
             $table->decimal('discount_total_percentage', 5, 2)->default(0);
             $table->decimal('discount_amount', 15, 2)->default(0);
             $table->decimal('total', 15, 2)->default(0);
-            $table->enum('status', ['draft','sent','accepted','shipping','delivered','completed','failed','cancelled',
-                ])->default('draft');
-            $table->enum('payment_status', ['unpaid','partially_paid','paid',
-                ])->default('unpaid');
+            $table->enum('status', ['draft', 'sent', 'accepted', 'shipping', 'delivered', 'completed', 'failed', 'cancelled',
+            ])->default('draft');
+            $table->enum('payment_status', ['unpaid', 'partially_paid', 'paid',
+            ])->default('unpaid');
             $table->text('notes')->nullable();
+            $table->boolean('quantity_difference_accepted')->default(false);
             $table->timestamps();
 
             $table->foreign('purchase_request_id')->references('purchase_request_id')->on('purchase_requests')->restrictOnUpdate()->restrictOnDelete();
@@ -39,7 +41,7 @@ return new class extends Migration
 
             $table->foreign('created_by')->references('id')->on('users')->restrictOnUpdate()->restrictOnDelete();
 
-            $table->unique(['supplier_quotation_id',]);
+            $table->unique(['supplier_quotation_id']);
         });
     }
 

@@ -14,11 +14,8 @@ class UpdatePurchaseOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'expected_delivery_date' => [
-                'sometimes',
-                'nullable',
-                'date',
-            ],
+            'shipping_date' => ['prohibited'],
+            'expected_delivery_date' => ['prohibited'],
 
             'notes' => [
                 'sometimes',

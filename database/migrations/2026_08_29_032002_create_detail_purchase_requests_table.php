@@ -15,6 +15,7 @@ return new class extends Migration
             $table->uuid('detail_purchase_request_id')->primary();
             $table->uuid('purchase_request_id');
             $table->uuid('item_id');
+            $table->foreignUuid('base_unit_id')->nullable()->constrained('units', 'unit_id')->restrictOnDelete();
             $table->integer('quantity');
             $table->text('notes')->nullable();
             $table->timestamps();

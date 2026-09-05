@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SupplierQuotation\StoreDetailSupplierQuotationRequest;
 use App\Http\Requests\SupplierQuotation\StoreSupplierQuotationRequest;
 use App\Http\Requests\SupplierQuotation\UpdateDetailSupplierQuotationRequest;
 use App\Http\Requests\SupplierQuotation\UpdateSupplierQuotationRequest;
@@ -46,6 +47,9 @@ class SupplierQuotationController extends Controller
         string $request_supplier_id
     ) {
         $supplierId = $request->user()->userSupplier?->supplier_id;
+
+        abort_if($request->user()->role === 'supplier' && $supplierId === null, 403,
+            'Akun supplier tidak terhubung dengan data supplier.');
 
         return response()->json([
             'message' => 'Detail Request Supplier berhasil diambil.',
@@ -110,6 +114,7 @@ class SupplierQuotationController extends Controller
      * Supplier memperbarui detail quotation.
      *
      * Field yang dapat diperbarui:
+     * - unit_id, quantity, conversion_qty
      * - unit_price
      * - discount_percentage
      */
@@ -132,5 +137,27 @@ class SupplierQuotationController extends Controller
                     $request->validated()
                 ),
         ]);
+    }
+
+    public function addDetail(
+        StoreDetailSupplierQuotationRequest $request,
+        string $supplier_quotation_id
+    ) {
+        $supplierId = $request->user()->userSupplier?->supplier_id;
+        abort_if($supplierId === null, 403, 'Akun supplier tidak terhubung dengan data supplier.');
+
+        return response()->json([
+            'message' => 'Baris kemasan berhasil ditambahkan.',
+            'data' => $this->supplierQuotationService->addDetail($supplier_quotation_id, $supplierId, $request->validated()),
+        ], 201);
+    }
+
+    public function deleteDetail(Request $request, string $supplier_quotation_id, string $detail_supplier_quotation_id)
+    {
+        $supplierId = $request->user()->userSupplier?->supplier_id;
+        abort_if($supplierId === null, 403, 'Akun supplier tidak terhubung dengan data supplier.');
+        $this->supplierQuotationService->deleteDetail($supplier_quotation_id, $detail_supplier_quotation_id, $supplierId);
+
+        return response()->json(['message' => 'Baris kemasan berhasil dihapus.']);
     }
 }

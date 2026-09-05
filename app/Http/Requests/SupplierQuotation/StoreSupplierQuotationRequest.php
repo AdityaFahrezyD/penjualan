@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\SupplierQuotation;
 
+use App\Services\QuotationPackaging;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreSupplierQuotationRequest extends FormRequest
@@ -14,6 +15,10 @@ class StoreSupplierQuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...collect(QuotationPackaging::rules())
+                ->mapWithKeys(fn ($rules, $field) => ['details.*.'.$field => $rules])->all(),
+            'details.*.base_quantity' => ['prohibited'],
+            'details.*.base_unit_id' => ['prohibited'],
             'quotation_date' => [
                 'required',
                 'date',
@@ -47,7 +52,6 @@ class StoreSupplierQuotationRequest extends FormRequest
             'details.*.detail_purchase_request_id' => [
                 'required',
                 'uuid',
-                'distinct',
                 'exists:detail_purchase_requests,detail_purchase_request_id',
             ],
 

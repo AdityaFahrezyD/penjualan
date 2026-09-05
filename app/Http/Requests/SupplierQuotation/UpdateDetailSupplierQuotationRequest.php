@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\SupplierQuotation;
 
+use App\Services\QuotationPackaging;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateDetailSupplierQuotationRequest extends FormRequest
@@ -14,6 +15,9 @@ class UpdateDetailSupplierQuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            ...QuotationPackaging::rules('sometimes'),
+            'base_quantity' => ['prohibited'],
+            'base_unit_id' => ['prohibited'],
             'unit_price' => [
                 'sometimes',
                 'required',

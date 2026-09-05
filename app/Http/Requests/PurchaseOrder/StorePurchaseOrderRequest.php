@@ -14,16 +14,14 @@ class StorePurchaseOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'accept_quantity_difference' => ['sometimes', 'boolean'],
             'order_date' => [
                 'required',
                 'date',
             ],
 
-            'expected_delivery_date' => [
-                'nullable',
-                'date',
-                'after_or_equal:order_date',
-            ],
+            'shipping_date' => ['prohibited'],
+            'expected_delivery_date' => ['prohibited'],
 
             'notes' => [
                 'nullable',

@@ -42,31 +42,21 @@ class PurchaseRequestService
         ) {
 
             $purchaseRequest = PurchaseRequest::create([
-                'request_number' =>
-                    $this->generateRequestNumber(),
-                'created_by' =>
-                    $user_id,
-                'request_date' =>
-                    $data['request_date'],
-                'notes' =>
-                    $data['notes'] ?? null,
-                'status' =>
-                    'draft',
+                'request_number' => $this->generateRequestNumber(),
+                'created_by' => $user_id,
+                'request_date' => $data['request_date'],
+                'notes' => $data['notes'] ?? null,
+                'status' => 'draft',
             ]);
 
             foreach ($data['details'] as $detail) {
 
                 DetailPurchaseRequest::create([
-                    'detail_purchase_request_id' =>
-                        (string) Str::uuid(),
-                    'purchase_request_id' =>
-                        $purchaseRequest->purchase_request_id,
-                    'item_id' =>
-                        $detail['item_id'],
-                    'quantity' =>
-                        $detail['quantity'],
-                    'notes' =>
-                        $detail['notes'] ?? null,
+                    'detail_purchase_request_id' => (string) Str::uuid(),
+                    'purchase_request_id' => $purchaseRequest->purchase_request_id,
+                    'item_id' => $detail['item_id'],
+                    'quantity' => $detail['quantity'],
+                    'notes' => $detail['notes'] ?? null,
                 ]);
             }
 
@@ -77,77 +67,17 @@ class PurchaseRequestService
         });
     }
 
-    /* Menambahkan satu detail ke Purchase Request.*/
+    /* Menambahkan satu detail ke Purchase Request. */
     public function addDetail(
         string $purchase_request_id,
         array $data
     ): DetailPurchaseRequest {
-        $purchaseRequest = PurchaseRequest::findOrFail(
-            $purchase_request_id
-        );
-
-        $this->ensureDraft($purchaseRequest);
-
-        $itemExists = DetailPurchaseRequest::where(
-            'purchase_request_id',
-            $purchase_request_id
-        )
-            ->where(
-                'item_id',
-                $data['item_id']
-            )
-            ->exists();
-
-        if ($itemExists) {
-            throw ValidationException::withMessages([
-                'item_id' => [
-                    'Item tersebut sudah ada dalam Purchase Request ini.',
-                ],
-            ]);
-        }
-
-        return DetailPurchaseRequest::create([
-            'purchase_request_id' =>
-                $purchase_request_id,
-            'item_id' =>
-                $data['item_id'],
-            'quantity' =>
-                $data['quantity'],
-            'notes' =>
-                $data['notes'] ?? null,
-
-        ])->load(
-            'item.itemUnit'
-        );
-    }
-
-    /* Mengubah satu detail Purchase Request. */
-    public function updateDetail(
-        string $purchase_request_id,
-        string $detail_purchase_request_id,
-        array $data
-    ): DetailPurchaseRequest {
-        $purchaseRequest = PurchaseRequest::findOrFail(
-            $purchase_request_id
-        );
-
-        $this->ensureDraft($purchaseRequest);
-
-        $detail = DetailPurchaseRequest::where(
-            'detail_purchase_request_id',
-            $detail_purchase_request_id
-        )
-            ->where(
-                'purchase_request_id',
+        return DB::transaction(function () use ($purchase_request_id, $data) {
+            $purchaseRequest = PurchaseRequest::lockForUpdate()->findOrFail(
                 $purchase_request_id
-            )
-            ->firstOrFail();
+            );
 
-        /* Jika item diubah, pastikan item tersebut belum digunakan oleh detail lain dalam PR ini. */
-        if (
-            isset($data['item_id']) &&
-            $data['item_id'] !== $detail->item_id
-        ) {
+            $this->ensureDraft($purchaseRequest);
 
             $itemExists = DetailPurchaseRequest::where(
                 'purchase_request_id',
@@ -157,30 +87,90 @@ class PurchaseRequestService
                     'item_id',
                     $data['item_id']
                 )
-                ->where(
-                    'detail_purchase_request_id',
-                    '!=',
-                    $detail_purchase_request_id
-                )
                 ->exists();
 
             if ($itemExists) {
-
                 throw ValidationException::withMessages([
                     'item_id' => [
                         'Item tersebut sudah ada dalam Purchase Request ini.',
                     ],
                 ]);
             }
-        }
 
-        $detail->update($data);
+            return DetailPurchaseRequest::create([
+                'purchase_request_id' => $purchase_request_id,
+                'item_id' => $data['item_id'],
+                'quantity' => $data['quantity'],
+                'notes' => $data['notes'] ?? null,
 
-        return $detail
-            ->fresh()
-            ->load(
-                'item.itemUnit'
+            ])->load(
+                'detailPurchaseRequestItem.itemUnit'
             );
+        });
+    }
+
+    /* Mengubah satu detail Purchase Request. */
+    public function updateDetail(
+        string $purchase_request_id,
+        string $detail_purchase_request_id,
+        array $data
+    ): DetailPurchaseRequest {
+        return DB::transaction(function () use ($purchase_request_id, $detail_purchase_request_id, $data) {
+            $purchaseRequest = PurchaseRequest::lockForUpdate()->findOrFail(
+                $purchase_request_id
+            );
+
+            $this->ensureDraft($purchaseRequest);
+
+            $detail = DetailPurchaseRequest::where(
+                'detail_purchase_request_id',
+                $detail_purchase_request_id
+            )
+                ->where(
+                    'purchase_request_id',
+                    $purchase_request_id
+                )
+                ->firstOrFail();
+
+            /* Jika item diubah, pastikan item tersebut belum digunakan oleh detail lain dalam PR ini. */
+            if (
+                isset($data['item_id']) &&
+                $data['item_id'] !== $detail->item_id
+            ) {
+
+                $itemExists = DetailPurchaseRequest::where(
+                    'purchase_request_id',
+                    $purchase_request_id
+                )
+                    ->where(
+                        'item_id',
+                        $data['item_id']
+                    )
+                    ->where(
+                        'detail_purchase_request_id',
+                        '!=',
+                        $detail_purchase_request_id
+                    )
+                    ->exists();
+
+                if ($itemExists) {
+
+                    throw ValidationException::withMessages([
+                        'item_id' => [
+                            'Item tersebut sudah ada dalam Purchase Request ini.',
+                        ],
+                    ]);
+                }
+            }
+
+            $detail->update($data);
+
+            return $detail
+                ->fresh()
+                ->load(
+                    'detailPurchaseRequestItem.itemUnit'
+                );
+        });
     }
 
     /* Menghapus satu detail Purchase Request. */
@@ -253,9 +243,9 @@ class PurchaseRequestService
     private function generateRequestNumber(): string
     {
         return 'PR-'
-            . now()->format('Ymd')
-            . '-'
-            . strtoupper(
+            .now()->format('Ymd')
+            .'-'
+            .strtoupper(
                 Str::random(6)
             );
     }

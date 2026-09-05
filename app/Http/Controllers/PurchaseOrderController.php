@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PurchaseOrder\StorePurchaseOrderRequest;
+use App\Http\Requests\PurchaseOrder\UpdateDeliveryEstimateRequest;
 use App\Http\Requests\PurchaseOrder\UpdatePurchaseOrderRequest;
 use App\Http\Requests\PurchaseOrder\UpdatePurchaseOrderStatusRequest;
 use App\Services\PurchaseOrderService;
-use Illuminate\Http\Request;
 
 class PurchaseOrderController extends Controller
 {
@@ -83,7 +83,22 @@ class PurchaseOrderController extends Controller
                 $purchase_order_id,
                 $request->validated()['status'],
                 $request->user()->role,
-                $request->user()->userSupplier?->supplier_id
+                $request->user()->userSupplier?->supplier_id,
+                $request->validated()
+            ),
+        ]);
+    }
+
+    public function updateDeliveryEstimate(
+        UpdateDeliveryEstimateRequest $request,
+        string $purchase_order_id
+    ) {
+        return response()->json([
+            'message' => 'Estimasi tanggal tiba berhasil diperbarui.',
+            'data' => $this->purchaseOrderService->updateDeliveryEstimate(
+                $purchase_order_id,
+                $request->user()->userSupplier->supplier_id,
+                $request->validated()
             ),
         ]);
     }

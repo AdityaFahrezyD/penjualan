@@ -194,6 +194,8 @@ class SupplierQuotationService
                         ]
                     );
 
+                $packaging = QuotationPackaging::calculate($purchaseRequestDetail, $detailData);
+
                 $unitPrice = $this->money($detailData['unit_price']);
 
                 $discountPercentage = (string) (
@@ -206,7 +208,7 @@ class SupplierQuotationService
                  * Harga sebelum diskon.
                  */
                 $grossAmount = bcmul(
-                    (string) $purchaseRequestDetail->quantity,
+                    (string) $packaging['quantity'],
                     $unitPrice,
                     2
                 );
@@ -227,6 +229,7 @@ class SupplierQuotationService
                 $detailSubtotal = bcsub($grossAmount, $discountAmount, 2);
 
                 DetailSupplierQuotation::create([
+                    ...$packaging,
                     'supplier_quotation_id' => $quotation->supplier_quotation_id,
 
                     'detail_purchase_request_id' => $purchaseRequestDetail
@@ -312,6 +315,7 @@ class SupplierQuotationService
                     'supplier_quotation_id',
                     $supplier_quotation_id
                 )
+                ->lockForUpdate()
                 ->firstOrFail();
 
             $this->ensureSupplierOwnership(
@@ -367,6 +371,7 @@ class SupplierQuotationService
                     'supplier_quotation_id',
                     $supplier_quotation_id
                 )
+                ->lockForUpdate()
                 ->firstOrFail();
 
             $this->ensureSupplierOwnership(
@@ -389,10 +394,14 @@ class SupplierQuotationService
                 )
                 ->firstOrFail();
 
-            $detail->update($data);
+            $packaging = QuotationPackaging::calculate(
+                $detail->detailSupplierQuotationPurchaseRequestDetail,
+                array_merge($detail->only(['unit_id', 'quantity', 'conversion_qty']), $data)
+            );
+            $detail->update(array_merge($data, $packaging));
 
             /*
-            * Ambil quantity dari Detail Purchase Request.
+            * Harga dihitung dari jumlah kemasan yang ditawarkan.
             */
             $detail->load(
                 'detailSupplierQuotationPurchaseRequestDetail'
@@ -401,7 +410,7 @@ class SupplierQuotationService
             $purchaseRequestDetail =
                 $detail->detailSupplierQuotationPurchaseRequestDetail;
 
-            $quantity = $purchaseRequestDetail->quantity;
+            $quantity = $detail->quantity;
 
             $unitPrice = $detail->unit_price;
 
@@ -442,6 +451,46 @@ class SupplierQuotationService
             return $detail->fresh()->load([
                 'detailSupplierQuotationPurchaseRequestDetail',
             ]);
+        });
+    }
+
+    public function addDetail(string $quotationId, string $supplierId, array $data): DetailSupplierQuotation
+    {
+        return DB::transaction(function () use ($quotationId, $supplierId, $data) {
+            $quotation = SupplierQuotation::lockForUpdate()->findOrFail($quotationId);
+            $this->ensureSupplierOwnership($quotation, $supplierId);
+            $this->ensureQuotationEditable($quotation);
+            $request = DetailPurchaseRequest::where('purchase_request_id',
+                $quotation->supplierQuotationRequestSupplier->purchase_request_id)
+                ->findOrFail($data['detail_purchase_request_id']);
+            $packaging = QuotationPackaging::calculate($request, $data);
+            $detail = DetailSupplierQuotation::create([
+                ...$packaging,
+                'supplier_quotation_id' => $quotationId,
+                'detail_purchase_request_id' => $request->detail_purchase_request_id,
+                'unit_price' => $data['unit_price'],
+                'discount_percentage' => $data['discount_percentage'] ?? 0,
+                'discount_amount' => 0,
+                'subtotal' => 0,
+            ]);
+
+            return $this->updateDetail($quotationId, $detail->detail_supplier_quotation_id, $supplierId, []);
+        });
+    }
+
+    public function deleteDetail(string $quotationId, string $detailId, string $supplierId): void
+    {
+        DB::transaction(function () use ($quotationId, $detailId, $supplierId) {
+            $quotation = SupplierQuotation::lockForUpdate()->findOrFail($quotationId);
+            $this->ensureSupplierOwnership($quotation, $supplierId);
+            $this->ensureQuotationEditable($quotation);
+            $detail = $quotation->supplierQuotationDetailSupplierQuotation()->findOrFail($detailId);
+            if ($quotation->supplierQuotationDetailSupplierQuotation()
+                ->where('detail_purchase_request_id', $detail->detail_purchase_request_id)->count() <= 1) {
+                throw ValidationException::withMessages(['details' => ['Setiap detail PR harus memiliki minimal satu baris penawaran.']]);
+            }
+            $detail->delete();
+            $this->recalculateQuotation($quotation);
         });
     }
 
