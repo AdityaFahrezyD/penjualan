@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PaymentService
@@ -14,8 +16,7 @@ class PaymentService
      */
     public function getByPurchaseOrder(
         string $purchase_order_id
-    )
-    {
+    ) {
         return Payment::with([
             'paymentUser',
             'paymentUserConfirm',
@@ -65,31 +66,38 @@ class PaymentService
             ]);
         }
 
-        return Payment::create([
-            'payment_number' =>
-                $data['payment_number'],
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            try {
+                return DB::transaction(fn () => Payment::create([
+                    'payment_number' => $this->generatePaymentNumber(),
 
-            'purchase_order_id' =>
-                $purchase_order_id,
+                    'purchase_order_id' => $purchase_order_id,
 
-            'created_by' =>
-                $user_id,
+                    'created_by' => $user_id,
 
-            'amount' =>
-                $data['amount'],
+                    'amount' => $data['amount'],
 
-            'payment_method' =>
-                $data['payment_method'],
+                    'payment_method' => $data['payment_method'],
 
-            'payment_date' =>
-                $data['payment_date'] ?? null,
+                    'payment_date' => $data['payment_date'] ?? null,
 
-            'status' =>
-                'draft',
+                    'status' => 'draft',
 
-            'notes' =>
-                $data['notes'] ?? null,
-        ]);
+                    'notes' => $data['notes'] ?? null,
+                ]));
+            } catch (UniqueConstraintViolationException $exception) {
+                $message = $exception->getPrevious()?->getMessage() ?? '';
+                if ($attempt === 2 || (! str_contains($message, 'payments_payment_number_unique')
+                    && ! str_contains($message, 'payments.payment_number'))) {
+                    throw $exception;
+                }
+            }
+        }
+    }
+
+    protected function generatePaymentNumber(): string
+    {
+        return 'PAY-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
     }
 
     /**

@@ -14,13 +14,6 @@ class StorePaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'payment_number' => [
-                'required',
-                'string',
-                'max:20',
-                'unique:payments,payment_number',
-            ],
-
             'amount' => [
                 'required',
                 'numeric',
