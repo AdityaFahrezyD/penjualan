@@ -52,8 +52,41 @@ class TokenLoginTest extends TestCase
         ])->assertStatus(419);
     }
 
-    public function test_other_api_routes_retain_stateful_csrf_checks(): void
+    public function test_api_mutation_requires_a_token(): void
     {
-        $this->postJson('/api/logout')->assertStatus(419);
+        $this->postJson('/api/units', [
+            'unit_name' => 'Piece', 'unit_code' => 'PCS',
+        ])->assertUnauthorized();
+        $this->assertDatabaseCount('units', 0);
+    }
+
+    public function test_invalid_token_is_rejected(): void
+    {
+        $this->withToken('invalid-token')->postJson('/api/units', [
+            'unit_name' => 'Piece', 'unit_code' => 'PCS',
+        ])->assertUnauthorized();
+        $this->assertDatabaseCount('units', 0);
+    }
+
+    public function test_bearer_token_allows_mutations_without_csrf_cookie(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $token = $user->createToken('test')->plainTextToken;
+        $this->withToken($token)->postJson('/api/units', [
+            'unit_name' => 'Piece', 'unit_code' => 'PCS',
+        ])->assertCreated();
+        $this->assertDatabaseHas('units', ['unit_code' => 'PCS']);
+        $this->postJson('/api/logout')->assertOk();
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_bearer_token_does_not_bypass_roles(): void
+    {
+        $user = User::factory()->create(['role' => 'supplier']);
+        $this->withToken($user->createToken('test')->plainTextToken)
+            ->postJson('/api/units', [
+                'unit_name' => 'Piece', 'unit_code' => 'PCS',
+            ])->assertForbidden();
+        $this->assertDatabaseCount('units', 0);
     }
 }
