@@ -47,6 +47,25 @@ class PaymentNumberTest extends TestCase
         $this->assertSame($first, Payment::where('payment_number', $first)->firstOrFail()->payment_number);
     }
 
+    public function test_payment_detail_is_available_to_admin_accountant_and_supplier(): void
+    {
+        $payment = app(PaymentService::class)->create($this->po->getKey(), $this->admin->id, [
+            'amount' => 1000, 'payment_method' => 'cash',
+        ]);
+        foreach (['admin', 'akuntan', 'supplier'] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+            $this->actingAs($user)->getJson('/api/payments/'.$payment->getKey())
+                ->assertOk()->assertJsonPath('data.status', 'draft');
+        }
+    }
+
+    public function test_payment_detail_requires_authentication(): void
+    {
+        $payment = app(PaymentService::class)->create($this->po->getKey(), $this->admin->id, [
+            'amount' => 1000, 'payment_method' => 'cash',
+        ]);
+        $this->getJson('/api/payments/'.$payment->getKey())->assertUnauthorized();
+    }
     private function generator(array $numbers): PaymentService
     {
         return new class($numbers) extends PaymentService

@@ -19,6 +19,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('role:admin,akuntan,supplier')->group(function () {
+        Route::get(
+            'payments/{payment_id}',
+            [PaymentController::class, 'show']
+        );
         Route::get('units', [UnitController::class, 'index']);
         Route::get(
             'supplier-quotations',
@@ -118,10 +122,6 @@ Route::middleware('auth:sanctum')->group(function () {
             [PaymentController::class, 'store']
         );
 
-        Route::get(
-            'payments/{payment_id}',
-            [PaymentController::class, 'show']
-        );
 
         Route::patch(
             'payments/{payment_id}',
@@ -168,9 +168,5 @@ Route::middleware('auth:sanctum')->group(function () {
             [SupplierQuotationController::class, 'updateDetail']
         );
 
-        Route::get(
-            'payments/{payment_id}',
-            [PaymentController::class, 'show']
-        );
     });
 });
