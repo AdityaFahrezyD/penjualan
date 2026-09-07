@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Supplier;
 
+use App\Models\Supplier;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,6 +16,9 @@ class UpdateSupplierRequest extends FormRequest
     public function rules(): array
     {
         $supplier = $this->route('supplier');
+        if (!($supplier instanceof Supplier)) {
+            $supplier = Supplier::query()->findOrFail($supplier);
+        }
 
         return [
             'user_id' => [
