@@ -10,7 +10,7 @@ define('LARAVEL_START', microtime(true));
 // public_html while the Laravel application remains in repositories/penjualan.
 $basePath = is_dir(__DIR__.'/../vendor')
     ? dirname(__DIR__)
-    : dirname(__DIR__).'/repositories/penjualan';
+    : dirname(__DIR__).'/repositories/penjualan_backend';
 
 // Determine if the application is in maintenance mode...
 if (file_exists($maintenance = $basePath.'/storage/framework/maintenance.php')) {
