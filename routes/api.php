@@ -66,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     });
     Route::middleware('role:admin,akuntan')->group(function () {
+        Route::delete('payments/{payment_id}', [PaymentController::class, 'destroy']);
 
         Route::get(
             'purchase-requests',

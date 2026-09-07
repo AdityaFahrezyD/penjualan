@@ -18,6 +18,7 @@ class StorePaymentRequest extends FormRequest
                 'required',
                 'numeric',
                 'gt:0',
+                'decimal:0,2',
             ],
 
             'payment_method' => [

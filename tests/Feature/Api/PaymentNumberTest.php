@@ -53,7 +53,7 @@ class PaymentNumberTest extends TestCase
             'amount' => 1000, 'payment_method' => 'cash',
         ]);
         foreach (['admin', 'akuntan', 'supplier'] as $role) {
-            $user = User::factory()->create(['role' => $role]);
+            $user = $role === 'supplier' ? $this->po->purchaseOrderSupplier->supplierUser : User::factory()->create(['role' => $role]);
             $this->actingAs($user)->getJson('/api/payments/'.$payment->getKey())
                 ->assertOk()->assertJsonPath('data.status', 'draft');
         }

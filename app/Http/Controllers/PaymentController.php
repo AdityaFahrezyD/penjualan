@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Payment\StorePaymentRequest;
 use App\Http\Requests\Payment\UpdatePaymentRequest;
 use App\Services\PaymentService;
+use App\Models\PurchaseOrder;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
@@ -17,24 +18,39 @@ class PaymentController extends Controller
      * Menampilkan seluruh Payment
      * berdasarkan Purchase Order.
      */
-    public function index(string $purchase_order_id)
+    public function index(Request $request, string $purchase_order_id)
     {
+        $this->authorizeRead($request, $purchase_order_id);
         return response()->json([
             'message' => 'Data Payment berhasil diambil.',
-            'data' => $this->paymentService
-                ->getByPurchaseOrder($purchase_order_id),
+            ...$this->paymentService->getWithSummary($purchase_order_id),
         ]);
     }
 
+    private function authorizeRead(Request $request, string $purchaseOrderId): void
+    {
+        if ($request->user()->role === 'supplier') {
+            $owned = PurchaseOrder::whereKey($purchaseOrderId)
+                ->whereHas('purchaseOrderSupplier', fn ($query) => $query->where('user_id', $request->user()->id))
+                ->exists();
+            abort_unless($owned, 403, 'Anda tidak memiliki akses ke pembayaran PO ini.');
+        }
+    }
+    public function destroy(string $payment_id)
+    {
+        $this->paymentService->delete($payment_id);
+        return response()->json(['message' => 'Pembayaran berhasil dihapus.']);
+    }
     /**
      * Menampilkan detail Payment.
      */
-    public function show(string $payment_id)
+    public function show(Request $request, string $payment_id)
     {
+        $payment = $this->paymentService->getById($payment_id);
+        $this->authorizeRead($request, $payment->purchase_order_id);
         return response()->json([
             'message' => 'Detail Payment berhasil diambil.',
-            'data' => $this->paymentService
-                ->getById($payment_id),
+            'data' => $payment,
         ]);
     }
 

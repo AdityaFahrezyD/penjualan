@@ -11,80 +11,115 @@ use Illuminate\Validation\ValidationException;
 
 class PaymentService
 {
-    /**
-     * Menampilkan payment berdasarkan Purchase Order.
-     */
-    public function getByPurchaseOrder(
-        string $purchase_order_id
-    ) {
-        return Payment::with([
-            'paymentUser',
-            'paymentUserConfirm',
-        ])
-            ->where(
-                'purchase_order_id',
-                $purchase_order_id
-            )
-            ->latest()
-            ->get();
+    public function getByPurchaseOrder(string $purchase_order_id)
+    {
+        return Payment::with(['paymentUser', 'paymentUserConfirm'])
+            ->where('purchase_order_id', $purchase_order_id)->latest()->get();
     }
 
-    /**
-     * Menampilkan detail Payment.
-     */
+    public function getWithSummary(string $purchase_order_id): array
+    {
+        return DB::transaction(function () use ($purchase_order_id) {
+            $po = PurchaseOrder::lockForUpdate()->findOrFail($purchase_order_id);
+            return [
+                'data' => $this->getByPurchaseOrder($purchase_order_id),
+                'meta' => ['payment_summary' => $this->summary($po)],
+            ];
+        });
+    }
+
     public function getById(string $payment_id): Payment
     {
-        return Payment::with([
-            'paymentPurchaseOrder',
-            'paymentUser',
-            'paymentUserConfirm',
-        ])->findOrFail($payment_id);
+        return Payment::with(['paymentPurchaseOrder', 'paymentUser', 'paymentUserConfirm'])->findOrFail($payment_id);
     }
 
-    /**
-     * Membuat Payment draft.
-     */
-    public function create(
-        string $purchase_order_id,
-        string $user_id,
-        array $data
-    ): Payment {
-        $purchaseOrder = PurchaseOrder::findOrFail(
-            $purchase_order_id
-        );
-
-        if (
-            in_array(
-                $purchaseOrder->status,
-                ['cancelled', 'failed']
-            )
-        ) {
-            throw ValidationException::withMessages([
-                'purchase_order' => [
-                    'Payment tidak dapat dibuat untuk Purchase Order ini.',
-                ],
-            ]);
+    // Integer minor units avoid floating-point comparisons for DECIMAL(15,2).
+    private function cents(mixed $amount): int
+    {
+        $text = (string) $amount;
+        if (! preg_match('/^-?\d{1,13}(?:\.\d{1,2})?$/D', $text)) {
+            throw ValidationException::withMessages(['amount' => ['Nominal harus berupa angka dengan maksimal dua angka desimal.']]);
         }
+        $negative = str_starts_with($text, '-');
+        $parts = explode('.', ltrim($text, '-'));
+        $value = ((int) $parts[0] * 100) + (int) str_pad($parts[1] ?? '', 2, '0');
+        return $negative ? -$value : $value;
+    }
 
+    private function decimal(int $cents): string
+    {
+        return ($cents < 0 ? '-' : '').intdiv(abs($cents), 100).'.'.str_pad((string) (abs($cents) % 100), 2, '0', STR_PAD_LEFT);
+    }
+
+    private function confirmedCents(PurchaseOrder $po): int
+    {
+        // A locking read also sees the latest committed values under MySQL REPEATABLE READ.
+        return Payment::where('purchase_order_id', $po->getKey())->where('status', 'confirmed')
+            ->lockForUpdate()->get(['amount'])->sum(fn ($payment) => $this->cents($payment->amount));
+    }
+
+    private function summary(PurchaseOrder $po): array
+    {
+        $total = $this->cents($po->total);
+        $confirmed = $this->confirmedCents($po);
+        return [
+            'total_amount' => $this->decimal($total),
+            'confirmed_amount' => $this->decimal($confirmed),
+            'remaining_amount' => $this->decimal($total - $confirmed),
+        ];
+    }
+
+    private function validateAmount(PurchaseOrder $po, mixed $amount): string
+    {
+        $value = $this->cents($amount);
+        if ($value <= 0) {
+            throw ValidationException::withMessages(['amount' => ['Nominal pembayaran harus lebih dari 0.']]);
+        }
+        if ($value > $this->cents($po->total) - $this->confirmedCents($po)) {
+            throw ValidationException::withMessages(['amount' => ['Jumlah pembayaran melebihi sisa tagihan Purchase Order.']]);
+        }
+        return $this->decimal($value);
+    }
+
+    // Always lock PO before payment, including reject/delete, to serialize competing actions.
+    private function withLockedPayment(string $id, callable $action): mixed
+    {
+        $poId = Payment::findOrFail($id)->purchase_order_id;
+        return DB::transaction(function () use ($id, $poId, $action) {
+            $po = PurchaseOrder::lockForUpdate()->findOrFail($poId);
+            $payment = Payment::where('purchase_order_id', $poId)->lockForUpdate()->findOrFail($id);
+            return $action($payment, $po);
+        });
+    }
+
+    private function requireStatus(Payment $payment, array $statuses, string $message): void
+    {
+        if (! in_array($payment->status, $statuses, true)) {
+            throw ValidationException::withMessages(['payment' => [$message]]);
+        }
+    }
+
+    public function create(string $purchase_order_id, string $user_id, array $data): Payment
+    {
         for ($attempt = 0; $attempt < 3; $attempt++) {
             try {
-                return DB::transaction(fn () => Payment::create([
-                    'payment_number' => $this->generatePaymentNumber(),
-
-                    'purchase_order_id' => $purchase_order_id,
-
-                    'created_by' => $user_id,
-
-                    'amount' => $data['amount'],
-
-                    'payment_method' => $data['payment_method'],
-
-                    'payment_date' => $data['payment_date'] ?? null,
-
-                    'status' => 'draft',
-
-                    'notes' => $data['notes'] ?? null,
-                ]));
+                return DB::transaction(function () use ($purchase_order_id, $user_id, $data) {
+                    $po = PurchaseOrder::lockForUpdate()->findOrFail($purchase_order_id);
+                    if (in_array($po->status, ['cancelled', 'failed'], true)) {
+                        throw ValidationException::withMessages(['purchase_order' => ['Payment tidak dapat dibuat untuk Purchase Order ini.']]);
+                    }
+                    $amount = $this->validateAmount($po, $data['amount']);
+                    return Payment::create([
+                        'payment_number' => $this->generatePaymentNumber(),
+                        'purchase_order_id' => $purchase_order_id,
+                        'created_by' => $user_id,
+                        'amount' => $amount,
+                        'payment_method' => $data['payment_method'],
+                        'payment_date' => $data['payment_date'] ?? null,
+                        'status' => 'draft',
+                        'notes' => $data['notes'] ?? null,
+                    ]);
+                });
             } catch (UniqueConstraintViolationException $exception) {
                 $message = $exception->getPrevious()?->getMessage() ?? '';
                 if ($attempt === 2 || (! str_contains($message, 'payments_payment_number_unique')
@@ -100,169 +135,54 @@ class PaymentService
         return 'PAY-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
     }
 
-    /**
-     * Update Payment selama masih draft.
-     */
-    public function update(
-        string $payment_id,
-        array $data
-    ): Payment {
-        $payment = Payment::findOrFail($payment_id);
-
-        if ($payment->status !== 'draft') {
-            throw ValidationException::withMessages([
-                'payment' => [
-                    'Payment hanya dapat diperbarui ketika berstatus draft.',
-                ],
-            ]);
-        }
-
-        $payment->update($data);
-
-        return $payment->fresh();
-    }
-
-    /**
-     * Mengirim payment untuk dikonfirmasi.
-     */
-    public function submit(
-        string $payment_id
-    ): Payment {
-        $payment = Payment::findOrFail($payment_id);
-
-        if ($payment->status !== 'draft') {
-            throw ValidationException::withMessages([
-                'payment' => [
-                    'Hanya Payment draft yang dapat dikirim.',
-                ],
-            ]);
-        }
-
-        $payment->update([
-            'status' => 'waiting_confirmation',
-        ]);
-
-        return $payment->fresh();
-    }
-
-    /**
-     * Konfirmasi Payment.
-     */
-    public function confirm(
-        string $payment_id,
-        string $confirmed_by
-    ): Payment {
-        return DB::transaction(function () use (
-            $payment_id,
-            $confirmed_by
-        ) {
-            $payment = Payment::with(
-                'paymentPurchaseOrder'
-            )->findOrFail($payment_id);
-
-            if (
-                $payment->status !== 'waiting_confirmation'
-            ) {
-                throw ValidationException::withMessages([
-                    'payment' => [
-                        'Payment ini tidak dapat dikonfirmasi.',
-                    ],
-                ]);
+    public function update(string $payment_id, array $data): Payment
+    {
+        return $this->withLockedPayment($payment_id, function ($payment, $po) use ($data) {
+            $this->requireStatus($payment, ['draft'], 'Payment hanya dapat diperbarui ketika berstatus draft.');
+            if (array_key_exists('amount', $data)) {
+                $data['amount'] = $this->validateAmount($po, $data['amount']);
             }
-
-            $purchaseOrder =
-                $payment->paymentPurchaseOrder;
-
-            /*
-             * Pastikan total pembayaran tidak
-             * melebihi total PO.
-             */
-            $confirmedAmount = Payment::where(
-                'purchase_order_id',
-                $purchaseOrder->purchase_order_id
-            )
-                ->where('status', 'confirmed')
-                ->sum('amount');
-
-            $remainingAmount =
-                $purchaseOrder->total
-                - $confirmedAmount;
-
-            if ($payment->amount > $remainingAmount) {
-                throw ValidationException::withMessages([
-                    'amount' => [
-                        'Jumlah pembayaran melebihi sisa tagihan Purchase Order.',
-                    ],
-                ]);
-            }
-
-            /*
-             * Konfirmasi payment.
-             */
-            $payment->update([
-                'status' => 'confirmed',
-                'confirmed_at' => now(),
-                'confirmed_by' => $confirmed_by,
-            ]);
-
-            /*
-             * Hitung ulang payment status PO.
-             */
-            $this->recalculatePaymentStatus(
-                $purchaseOrder
-            );
-
+            $payment->update($data);
             return $payment->fresh();
         });
     }
 
-    /**
-     * Reject Payment.
-     */
-    public function reject(string $payment_id): Payment
+    public function submit(string $payment_id): Payment
     {
-        $payment = Payment::findOrFail($payment_id);
-
-        if (
-            $payment->status !== 'waiting_confirmation'
-        ) {
-            throw ValidationException::withMessages([
-                'payment' => [
-                    'Payment ini tidak dapat ditolak.',
-                ],
-            ]);
-        }
-
-        $payment->update([
-            'status' => 'rejected',
-        ]);
-
-        return $payment->fresh();
+        return $this->withLockedPayment($payment_id, function ($payment, $po) {
+            $this->requireStatus($payment, ['draft'], 'Hanya Payment draft yang dapat dikirim.');
+            $this->validateAmount($po, $payment->amount);
+            $payment->update(['status' => 'waiting_confirmation']);
+            return $payment->fresh();
+        });
     }
 
-    /**
-     * Menghitung status pembayaran Purchase Order.
-     */
-    private function recalculatePaymentStatus(
-        PurchaseOrder $purchaseOrder
-    ): void {
-        $confirmedAmount = Payment::where(
-            'purchase_order_id',
-            $purchaseOrder->purchase_order_id
-        )
-            ->where('status', 'confirmed')
-            ->sum('amount');
+    public function confirm(string $payment_id, string $confirmed_by): Payment
+    {
+        return $this->withLockedPayment($payment_id, function ($payment, $po) use ($confirmed_by) {
+            $this->requireStatus($payment, ['waiting_confirmation'], 'Payment ini tidak dapat dikonfirmasi.');
+            $this->validateAmount($po, $payment->amount);
+            $payment->update(['status' => 'confirmed', 'confirmed_at' => now(), 'confirmed_by' => $confirmed_by]);
+            $confirmed = $this->confirmedCents($po);
+            $po->update(['payment_status' => $confirmed >= $this->cents($po->total) ? 'paid' : 'partially_paid']);
+            return $payment->fresh();
+        });
+    }
 
-        if ($confirmedAmount <= 0) {
-            $status = 'unpaid';
-        } elseif ($confirmedAmount < $purchaseOrder->total) {
-            $status = 'partially_paid';
-        } else {
-            $status = 'paid';
-        }
+    public function reject(string $payment_id): Payment
+    {
+        return $this->withLockedPayment($payment_id, function ($payment) {
+            $this->requireStatus($payment, ['waiting_confirmation'], 'Payment ini tidak dapat ditolak.');
+            $payment->update(['status' => 'rejected']);
+            return $payment->fresh();
+        });
+    }
 
-        $purchaseOrder->update([
-            'payment_status' => $status,
-        ]);
+    public function delete(string $payment_id): void
+    {
+        $this->withLockedPayment($payment_id, function ($payment) {
+            $this->requireStatus($payment, ['draft', 'waiting_confirmation', 'rejected'], 'Pembayaran terkonfirmasi tidak dapat dihapus.');
+            $payment->delete();
+        });
     }
 }
