@@ -13,9 +13,9 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Login API menerbitkan Bearer token tanpa menggunakan session cookie.
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:api-login');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api-authenticated'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::middleware('role:admin,akuntan,supplier')->group(function () {
@@ -23,7 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
             'payments/{payment_id}',
             [PaymentController::class, 'show']
         );
-        Route::get('units', [UnitController::class, 'index']);
+        Route::get('units', [UnitController::class, 'index'])->middleware('cache.master:units');
         Route::get(
             'supplier-quotations',
             [SupplierQuotationController::class, 'index']
@@ -60,9 +60,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('suppliers', SupplierController::class);
 
-        Route::apiResource('units', UnitController::class)->except(['index']);
+        Route::apiResource('units', UnitController::class)->except(['index'])
+            ->middlewareFor('show', 'cache.master:units');
 
-        Route::apiResource('items', ItemController::class);
+        Route::apiResource('items', ItemController::class)
+            ->middlewareFor(['index', 'show'], 'cache.master:items');
 
     });
     Route::middleware('role:admin,akuntan')->group(function () {

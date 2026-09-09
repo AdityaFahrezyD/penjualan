@@ -379,6 +379,9 @@ class PurchaseOrderService
                             $detail->base_quantity
                         );
                 }
+
+                // Relation-query increments bypass Item model observers.
+                DB::afterCommit(fn () => app(MasterDataCache::class)->invalidate('items'));
             }
 
             $purchaseOrder->update([
